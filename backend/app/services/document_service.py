@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.document import Document, DocumentStatus
 from app.models.document_version import DocumentVersion
+from app.models.clause import Clause
 from app.models.user import User
 from app.core.supabase import get_supabase_client
 
@@ -168,3 +169,33 @@ class DocumentService:
         await self.db.commit()
 
         return True
+
+    async def get_document_clauses(
+        self, document_id: uuid.UUID
+    ) -> List[Clause]:
+        """Get all clauses for a document.
+
+        Args:
+            document_id: UUID of the document
+
+        Returns:
+            List of clauses ordered by position
+        """
+        # First get the document version(s)
+        result = await self.db.execute(
+            select(DocumentVersion.id)
+            .where(DocumentVersion.document_id == document_id)
+        )
+        version_ids = [row[0] for row in result.fetchall()]
+
+        if not version_ids:
+            return []
+
+        # Get clauses for those versions, ordered by risk score (highest first)
+        result = await self.db.execute(
+            select(Clause)
+            .where(Clause.document_version_id.in_(version_ids))
+            .order_by(Clause.risk_score.desc(), Clause.start_position)
+        )
+
+        return list(result.scalars().all())

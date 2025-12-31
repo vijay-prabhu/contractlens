@@ -16,6 +16,7 @@ from app.models.clause import Clause
 from app.services.extraction_service import ExtractionService
 from app.services.chunking_service import ChunkingService, TextChunk
 from app.services.embedding_service import EmbeddingService
+from app.services.classification_service import ClassificationService
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class DocumentProcessor:
         self.extraction_service = ExtractionService()
         self.chunking_service = ChunkingService()
         self.embedding_service = EmbeddingService()
+        self.classification_service = ClassificationService()
         self._running = False
         self._task: Optional[asyncio.Task] = None
 
@@ -94,7 +96,7 @@ class DocumentProcessor:
 
                 # Update status to analyzing
                 await self._update_status(
-                    session, document, DocumentStatus.ANALYZING, "Generating embeddings"
+                    session, document, DocumentStatus.ANALYZING, "Generating embeddings and classifying clauses"
                 )
 
                 # Get document version for clause association
@@ -168,7 +170,7 @@ class DocumentProcessor:
         document_version_id: uuid.UUID,
         chunks: List[TextChunk],
     ) -> int:
-        """Create clause records with embeddings for each chunk.
+        """Create clause records with embeddings and classifications for each chunk.
 
         Args:
             session: Database session
@@ -181,25 +183,46 @@ class DocumentProcessor:
         if not chunks:
             return 0
 
-        # Extract text from chunks for batch embedding
+        # Extract text from chunks for batch processing
         chunk_texts = [chunk.content for chunk in chunks]
 
+        # Generate embeddings in batch
         try:
-            # Generate embeddings in batch
             embeddings = self.embedding_service.generate_embeddings(chunk_texts)
+            logger.info(f"Generated embeddings for {len(embeddings)} chunks")
         except Exception as e:
             logger.error(f"Failed to generate embeddings: {e}")
-            # Continue without embeddings if API fails
             embeddings = [None] * len(chunks)
 
-        # Create clause records
+        # Classify clauses using GPT-4o-mini
+        try:
+            classifications = self.classification_service.classify_clauses_batch(chunk_texts)
+            logger.info(f"Classified {len(classifications)} clauses")
+        except Exception as e:
+            logger.error(f"Failed to classify clauses: {e}")
+            # Create default classifications on error
+            from app.services.classification_service import ClassificationResult
+            from app.models.clause import ClauseType, RiskLevel
+            classifications = [
+                ClassificationResult(
+                    clause_type=ClauseType.OTHER.value,
+                    risk_level=RiskLevel.LOW.value,
+                    risk_score=0.0,
+                    risk_explanation="Classification unavailable",
+                    confidence=0.0,
+                )
+                for _ in chunks
+            ]
+
+        # Create clause records with embeddings and classifications
         clauses_created = 0
-        for chunk, embedding in zip(chunks, embeddings):
+        for chunk, embedding, classification in zip(chunks, embeddings, classifications):
             clause = Clause(
                 text=chunk.content,
-                clause_type="other",  # Will be classified in Day 4
-                risk_level="low",     # Will be scored in Day 4
-                risk_score=0.0,
+                clause_type=classification.clause_type,
+                risk_level=classification.risk_level,
+                risk_score=classification.risk_score,
+                risk_explanation=classification.risk_explanation,
                 start_position=chunk.start_char,
                 end_position=chunk.end_char,
                 embedding=embedding,
@@ -208,7 +231,14 @@ class DocumentProcessor:
             session.add(clause)
             clauses_created += 1
 
-        logger.info(f"Created {clauses_created} clauses with embeddings")
+        # Log risk summary
+        risk_summary = self.classification_service.calculate_document_risk_summary(classifications)
+        logger.info(
+            f"Created {clauses_created} clauses - "
+            f"Risk: {risk_summary['overall_risk_level']} ({risk_summary['overall_risk_score']:.2f}), "
+            f"Critical: {risk_summary['critical_clauses']}, High: {risk_summary['high_risk_clauses']}"
+        )
+
         return clauses_created
 
     async def start_background_worker(self, poll_interval: int = 5) -> None:

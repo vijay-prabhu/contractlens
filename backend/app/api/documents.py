@@ -9,6 +9,10 @@ from app.api.schemas import (
     DocumentListResponse,
     DocumentUploadResponse,
     DocumentProcessResponse,
+    DocumentAnalysisResponse,
+    DocumentRiskAnalysis,
+    RiskDistribution,
+    ClauseResponse,
     ErrorResponse,
 )
 from app.services.document_service import DocumentService
@@ -175,6 +179,113 @@ async def get_document(
         user_id=document.user_id,
         created_at=document.created_at,
         updated_at=document.updated_at,
+    )
+
+
+@router.get(
+    "/{document_id}/analysis",
+    response_model=DocumentAnalysisResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Document not found"},
+        400: {"model": ErrorResponse, "description": "Document not processed"},
+    },
+)
+async def get_document_analysis(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get risk analysis for a processed document.
+
+    Returns the document, risk analysis summary, and all classified clauses.
+    """
+    service = DocumentService(db)
+    document = await service.get_document(document_id)
+
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    if document.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Document not processed. Current status: {document.status}",
+        )
+
+    # Get clauses for this document
+    clauses = await service.get_document_clauses(document_id)
+
+    # Calculate risk analysis from clauses
+    risk_counts = {"low": 0, "medium": 0, "high": 0, "critical": 0}
+    total_risk_score = 0.0
+
+    for clause in clauses:
+        risk_counts[clause.risk_level] = risk_counts.get(clause.risk_level, 0) + 1
+        total_risk_score += clause.risk_score
+
+    avg_risk_score = total_risk_score / len(clauses) if clauses else 0.0
+
+    # Determine overall risk level
+    critical_count = risk_counts.get("critical", 0)
+    high_count = risk_counts.get("high", 0)
+
+    if critical_count >= 1:
+        overall_level = "critical"
+    elif high_count >= 3 or (high_count >= 1 and avg_risk_score > 0.6):
+        overall_level = "high"
+    elif avg_risk_score > 0.4:
+        overall_level = "medium"
+    else:
+        overall_level = "low"
+
+    # Build response
+    doc_response = DocumentResponse(
+        id=document.id,
+        filename=document.filename,
+        original_filename=document.original_filename,
+        file_type=document.file_type,
+        file_size=document.file_size,
+        status=document.status,
+        status_message=document.status_message,
+        page_count=document.page_count,
+        chunk_count=document.chunk_count,
+        word_count=document.word_count,
+        user_id=document.user_id,
+        created_at=document.created_at,
+        updated_at=document.updated_at,
+    )
+
+    risk_analysis = DocumentRiskAnalysis(
+        overall_risk_score=round(avg_risk_score, 3),
+        overall_risk_level=overall_level,
+        clause_count=len(clauses),
+        risk_distribution=RiskDistribution(**risk_counts),
+        high_risk_clauses=high_count,
+        critical_clauses=critical_count,
+    )
+
+    clause_responses = [
+        ClauseResponse(
+            id=c.id,
+            text=c.text,
+            clause_type=c.clause_type,
+            risk_level=c.risk_level,
+            risk_score=c.risk_score,
+            risk_explanation=c.risk_explanation,
+            start_position=c.start_position,
+            end_position=c.end_position,
+            page_number=c.page_number,
+            created_at=c.created_at,
+        )
+        for c in clauses
+    ]
+
+    return DocumentAnalysisResponse(
+        document=doc_response,
+        risk_analysis=risk_analysis,
+        clauses=clause_responses,
     )
 
 

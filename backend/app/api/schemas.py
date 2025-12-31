@@ -108,6 +108,44 @@ class ClauseResponse(BaseModel):
         from_attributes = True
 
 
+# Risk Analysis schemas
+class RiskDistribution(BaseModel):
+    low: int = 0
+    medium: int = 0
+    high: int = 0
+    critical: int = 0
+
+
+class DocumentRiskAnalysis(BaseModel):
+    overall_risk_score: float = Field(..., ge=0.0, le=1.0)
+    overall_risk_level: str
+    clause_count: int
+    risk_distribution: RiskDistribution
+    high_risk_clauses: int
+    critical_clauses: int
+
+
+class DocumentAnalysisResponse(BaseModel):
+    document: DocumentResponse
+    risk_analysis: DocumentRiskAnalysis
+    clauses: List[ClauseResponse]
+
+
+class ClauseTypeCount(BaseModel):
+    clause_type: str
+    count: int
+    avg_risk_score: float
+
+
+class DocumentAnalysisSummary(BaseModel):
+    document_id: UUID
+    overall_risk_level: str
+    overall_risk_score: float
+    total_clauses: int
+    clause_type_breakdown: List[ClauseTypeCount]
+    top_risk_clauses: List[ClauseResponse]
+
+
 # Error schemas
 class ErrorResponse(BaseModel):
     detail: str
