@@ -42,6 +42,12 @@ class Document(Base, TimestampMixin):
     )
     status_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Processing results
+    extracted_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_count: Mapped[Optional[int]] = mapped_column(nullable=True)
+    chunk_count: Mapped[Optional[int]] = mapped_column(nullable=True)
+    word_count: Mapped[Optional[int]] = mapped_column(nullable=True)
+
     # Foreign keys
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -55,4 +61,4 @@ class Document(Base, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<Document {self.original_filename} ({self.status.value})>"
+        return f"<Document {self.original_filename} ({self.status})>"

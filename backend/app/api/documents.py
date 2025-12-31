@@ -8,9 +8,11 @@ from app.api.schemas import (
     DocumentResponse,
     DocumentListResponse,
     DocumentUploadResponse,
+    DocumentProcessResponse,
     ErrorResponse,
 )
 from app.services.document_service import DocumentService
+from app.workers import processor
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -125,6 +127,9 @@ async def list_documents(
                 file_size=doc.file_size,
                 status=doc.status,
                 status_message=doc.status_message,
+                page_count=doc.page_count,
+                chunk_count=doc.chunk_count,
+                word_count=doc.word_count,
                 user_id=doc.user_id,
                 created_at=doc.created_at,
                 updated_at=doc.updated_at,
@@ -164,10 +169,68 @@ async def get_document(
         file_size=document.file_size,
         status=document.status,
         status_message=document.status_message,
+        page_count=document.page_count,
+        chunk_count=document.chunk_count,
+        word_count=document.word_count,
         user_id=document.user_id,
         created_at=document.created_at,
         updated_at=document.updated_at,
     )
+
+
+@router.post(
+    "/{document_id}/process",
+    response_model=DocumentProcessResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Document not found"},
+        409: {"model": ErrorResponse, "description": "Document already processed"},
+    },
+)
+async def process_document(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Manually trigger processing for a document.
+
+    The document will be extracted and chunked for analysis.
+    """
+    service = DocumentService(db)
+    document = await service.get_document(document_id)
+
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    if document.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document has already been processed",
+        )
+
+    if document.status in ["processing", "extracting", "analyzing"]:
+        return DocumentProcessResponse(
+            id=document.id,
+            status=document.status,
+            message="Document is already being processed",
+        )
+
+    # Trigger processing
+    success = await processor.process_document(document_id)
+
+    if success:
+        return DocumentProcessResponse(
+            id=document_id,
+            status="completed",
+            message="Document processed successfully",
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Processing failed",
+        )
 
 
 @router.delete(

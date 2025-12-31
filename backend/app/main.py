@@ -12,6 +12,7 @@ from app.core.exceptions import (
     general_exception_handler,
 )
 from app.api.documents import router as documents_router
+from app.workers import start_processor, stop_processor
 
 settings = get_settings()
 
@@ -22,10 +23,14 @@ async def lifespan(app: FastAPI):
     # Startup
     print("Starting up ContractLens API...")
     # Note: Tables are managed via SQL migrations, not auto-created
+    await start_processor()
+    print("Background processor started.")
     print("Ready to accept connections.")
     yield
     # Shutdown
     print("Shutting down...")
+    await stop_processor()
+    print("Background processor stopped.")
     await close_db()
     print("Database connections closed.")
 

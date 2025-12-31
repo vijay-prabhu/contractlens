@@ -46,12 +46,21 @@ class DocumentResponse(BaseModel):
     file_size: int
     status: str
     status_message: Optional[str] = None
+    page_count: Optional[int] = None
+    chunk_count: Optional[int] = None
+    word_count: Optional[int] = None
     user_id: UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class DocumentProcessResponse(BaseModel):
+    id: UUID
+    status: str
+    message: str
 
 
 class DocumentListResponse(BaseModel):
