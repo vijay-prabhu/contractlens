@@ -1,9 +1,34 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import get_settings
+from app.core.database import init_db, close_db
+from app.core.exceptions import (
+    http_exception_handler,
+    validation_exception_handler,
+    general_exception_handler,
+)
+from app.api.documents import router as documents_router
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifecycle events."""
+    # Startup
+    print("Starting up ContractLens API...")
+    # Note: Tables are managed via SQL migrations, not auto-created
+    print("Ready to accept connections.")
+    yield
+    # Shutdown
+    print("Shutting down...")
+    await close_db()
+    print("Database connections closed.")
+
 
 app = FastAPI(
     title=settings.app_name,
@@ -11,7 +36,13 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
+    lifespan=lifespan,
 )
+
+# Exception handlers
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
 
 # CORS middleware
 app.add_middleware(
@@ -21,6 +52,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(documents_router, prefix="/api/v1")
 
 
 @app.get("/")
