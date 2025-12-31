@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.auth import get_current_user, CurrentUser
 from app.api.schemas import (
     DocumentResponse,
     DocumentListResponse,
@@ -35,6 +36,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 )
 async def upload_document(
     file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -43,6 +45,7 @@ async def upload_document(
     - **file**: The document file to upload (max 10MB)
 
     Returns the created document with initial status.
+    Requires authentication.
     """
     service = DocumentService(db)
 
@@ -64,9 +67,6 @@ async def upload_document(
     # Get file type
     file_type = service.get_file_type(file.filename or "unknown")
 
-    # Get or create test user (for development)
-    user = await service.get_or_create_test_user()
-
     try:
         # Upload to storage
         storage_path = await service.upload_to_storage(
@@ -81,7 +81,7 @@ async def upload_document(
             original_filename=file.filename or "unknown",
             file_type=file_type,
             file_size=file_size,
-            user_id=user.id,
+            user_id=current_user.id,
             storage_path=storage_path,
         )
 
@@ -109,6 +109,7 @@ async def upload_document(
 async def list_documents(
     skip: int = 0,
     limit: int = 100,
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -116,13 +117,11 @@ async def list_documents(
 
     - **skip**: Number of documents to skip (pagination)
     - **limit**: Maximum number of documents to return
+
+    Requires authentication.
     """
     service = DocumentService(db)
-
-    # Get test user for development
-    user = await service.get_or_create_test_user()
-
-    documents = await service.get_documents(user.id, skip, limit)
+    documents = await service.get_documents(current_user.id, skip, limit)
 
     return DocumentListResponse(
         documents=[
@@ -154,10 +153,13 @@ async def list_documents(
 )
 async def get_document(
     document_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Get a specific document by ID.
+
+    Requires authentication. Users can only access their own documents.
     """
     service = DocumentService(db)
     document = await service.get_document(document_id)
@@ -166,6 +168,13 @@ async def get_document(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
+        )
+
+    # Ownership check
+    if document.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
         )
 
     return DocumentResponse(
@@ -195,12 +204,14 @@ async def get_document(
 )
 async def get_document_analysis(
     document_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Get risk analysis for a processed document.
 
     Returns the document, risk analysis summary, and all classified clauses.
+    Requires authentication. Users can only access their own documents.
     """
     service = DocumentService(db)
     document = await service.get_document(document_id)
@@ -209,6 +220,13 @@ async def get_document_analysis(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
+        )
+
+    # Ownership check
+    if document.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
         )
 
     if document.status != "completed":
@@ -302,12 +320,14 @@ async def get_document_analysis(
 )
 async def process_document(
     document_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Manually trigger processing for a document.
 
     The document will be extracted and chunked for analysis.
+    Requires authentication. Users can only process their own documents.
     """
     service = DocumentService(db)
     document = await service.get_document(document_id)
@@ -316,6 +336,13 @@ async def process_document(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
+        )
+
+    # Ownership check
+    if document.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
         )
 
     if document.status == "completed":
@@ -354,12 +381,30 @@ async def process_document(
 )
 async def delete_document(
     document_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Delete a document and all its versions.
+
+    Requires authentication. Users can only delete their own documents.
     """
     service = DocumentService(db)
+
+    # Check ownership first
+    document = await service.get_document(document_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    if document.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
     deleted = await service.delete_document(document_id)
 
     if not deleted:
@@ -379,12 +424,14 @@ async def delete_document(
 )
 async def list_versions(
     document_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     List all versions of a document.
 
     Returns versions ordered by version number (newest first).
+    Requires authentication. Users can only access their own documents.
     """
     service = DocumentService(db)
     document = await service.get_document(document_id)
@@ -393,6 +440,13 @@ async def list_versions(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
+        )
+
+    # Ownership check
+    if document.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
         )
 
     versions = await service.get_document_versions(document_id)
@@ -427,6 +481,7 @@ async def list_versions(
 async def upload_new_version(
     document_id: UUID,
     file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -435,6 +490,7 @@ async def upload_new_version(
     - **file**: The new version file (must be same type as original)
 
     The new version will be processed automatically.
+    Requires authentication. Users can only upload to their own documents.
     """
     service = DocumentService(db)
 
@@ -444,6 +500,13 @@ async def upload_new_version(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
+        )
+
+    # Ownership check
+    if document.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
         )
 
     # Validate file

@@ -40,6 +40,7 @@ class SearchService:
         limit: int = 10,
         min_similarity: float = 0.5,
         document_id: Optional[UUID] = None,
+        user_id: Optional[UUID] = None,
     ) -> List[SearchResult]:
         """Search for clauses semantically similar to the query.
 
@@ -48,6 +49,7 @@ class SearchService:
             limit: Maximum number of results
             min_similarity: Minimum cosine similarity threshold (0 to 1)
             document_id: Optional filter by specific document
+            user_id: Optional filter by user (for data isolation)
 
         Returns:
             List of SearchResult objects sorted by similarity
@@ -63,60 +65,44 @@ class SearchService:
         # Using cosine distance: 1 - (embedding <=> query_embedding)
         embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
 
+        # Build WHERE clause based on filters
+        where_clauses = [
+            "c.embedding IS NOT NULL",
+            "1 - (c.embedding <=> cast(:embedding as vector)) >= :min_similarity",
+        ]
+        params = {
+            "embedding": embedding_str,
+            "min_similarity": min_similarity,
+            "limit": limit,
+        }
+
         if document_id:
-            sql = text("""
-                SELECT
-                    c.id,
-                    c.text,
-                    c.clause_type,
-                    c.risk_level,
-                    1 - (c.embedding <=> cast(:embedding as vector)) as similarity,
-                    d.id as document_id,
-                    d.original_filename as document_name
-                FROM clauses c
-                JOIN document_versions dv ON c.document_version_id = dv.id
-                JOIN documents d ON dv.document_id = d.id
-                WHERE c.embedding IS NOT NULL
-                    AND d.id = cast(:document_id as uuid)
-                    AND 1 - (c.embedding <=> cast(:embedding as vector)) >= :min_similarity
-                ORDER BY c.embedding <=> cast(:embedding as vector)
-                LIMIT :limit
-            """)
-            result = await self.db.execute(
-                sql,
-                {
-                    "embedding": embedding_str,
-                    "document_id": str(document_id),
-                    "min_similarity": min_similarity,
-                    "limit": limit,
-                },
-            )
-        else:
-            sql = text("""
-                SELECT
-                    c.id,
-                    c.text,
-                    c.clause_type,
-                    c.risk_level,
-                    1 - (c.embedding <=> cast(:embedding as vector)) as similarity,
-                    d.id as document_id,
-                    d.original_filename as document_name
-                FROM clauses c
-                JOIN document_versions dv ON c.document_version_id = dv.id
-                JOIN documents d ON dv.document_id = d.id
-                WHERE c.embedding IS NOT NULL
-                    AND 1 - (c.embedding <=> cast(:embedding as vector)) >= :min_similarity
-                ORDER BY c.embedding <=> cast(:embedding as vector)
-                LIMIT :limit
-            """)
-            result = await self.db.execute(
-                sql,
-                {
-                    "embedding": embedding_str,
-                    "min_similarity": min_similarity,
-                    "limit": limit,
-                },
-            )
+            where_clauses.append("d.id = cast(:document_id as uuid)")
+            params["document_id"] = str(document_id)
+
+        if user_id:
+            where_clauses.append("d.user_id = cast(:user_id as uuid)")
+            params["user_id"] = str(user_id)
+
+        where_sql = " AND ".join(where_clauses)
+
+        sql = text(f"""
+            SELECT
+                c.id,
+                c.text,
+                c.clause_type,
+                c.risk_level,
+                1 - (c.embedding <=> cast(:embedding as vector)) as similarity,
+                d.id as document_id,
+                d.original_filename as document_name
+            FROM clauses c
+            JOIN document_versions dv ON c.document_version_id = dv.id
+            JOIN documents d ON dv.document_id = d.id
+            WHERE {where_sql}
+            ORDER BY c.embedding <=> cast(:embedding as vector)
+            LIMIT :limit
+        """)
+        result = await self.db.execute(sql, params)
 
         rows = result.fetchall()
 
@@ -139,6 +125,7 @@ class SearchService:
         limit: int = 5,
         min_similarity: float = 0.7,
         exclude_same_document: bool = True,
+        user_id: Optional[UUID] = None,
     ) -> List[SearchResult]:
         """Find clauses similar to a given clause.
 
@@ -147,6 +134,7 @@ class SearchService:
             limit: Maximum number of results
             min_similarity: Minimum cosine similarity threshold
             exclude_same_document: Whether to exclude clauses from same document
+            user_id: Optional filter by user (for data isolation)
 
         Returns:
             List of similar clauses
@@ -162,6 +150,19 @@ class SearchService:
 
         embedding_str = "[" + ",".join(str(x) for x in source_clause.embedding) + "]"
 
+        # Build WHERE clause based on filters
+        where_clauses = [
+            "c.embedding IS NOT NULL",
+            "c.id != cast(:clause_id as uuid)",
+            "1 - (c.embedding <=> cast(:embedding as vector)) >= :min_similarity",
+        ]
+        params = {
+            "embedding": embedding_str,
+            "clause_id": str(clause_id),
+            "min_similarity": min_similarity,
+            "limit": limit,
+        }
+
         if exclude_same_document:
             # Get the document ID for exclusion
             version_result = await self.db.execute(
@@ -170,65 +171,33 @@ class SearchService:
                 )
             )
             source_version = version_result.scalar_one_or_none()
-            source_document_id = source_version.document_id if source_version else None
+            if source_version:
+                where_clauses.append("d.id != cast(:exclude_document_id as uuid)")
+                params["exclude_document_id"] = str(source_version.document_id)
 
-            sql = text("""
-                SELECT
-                    c.id,
-                    c.text,
-                    c.clause_type,
-                    c.risk_level,
-                    1 - (c.embedding <=> cast(:embedding as vector)) as similarity,
-                    d.id as document_id,
-                    d.original_filename as document_name
-                FROM clauses c
-                JOIN document_versions dv ON c.document_version_id = dv.id
-                JOIN documents d ON dv.document_id = d.id
-                WHERE c.embedding IS NOT NULL
-                    AND c.id != cast(:clause_id as uuid)
-                    AND d.id != cast(:exclude_document_id as uuid)
-                    AND 1 - (c.embedding <=> cast(:embedding as vector)) >= :min_similarity
-                ORDER BY c.embedding <=> cast(:embedding as vector)
-                LIMIT :limit
-            """)
-            result = await self.db.execute(
-                sql,
-                {
-                    "embedding": embedding_str,
-                    "clause_id": str(clause_id),
-                    "exclude_document_id": str(source_document_id),
-                    "min_similarity": min_similarity,
-                    "limit": limit,
-                },
-            )
-        else:
-            sql = text("""
-                SELECT
-                    c.id,
-                    c.text,
-                    c.clause_type,
-                    c.risk_level,
-                    1 - (c.embedding <=> cast(:embedding as vector)) as similarity,
-                    d.id as document_id,
-                    d.original_filename as document_name
-                FROM clauses c
-                JOIN document_versions dv ON c.document_version_id = dv.id
-                JOIN documents d ON dv.document_id = d.id
-                WHERE c.embedding IS NOT NULL
-                    AND c.id != cast(:clause_id as uuid)
-                    AND 1 - (c.embedding <=> cast(:embedding as vector)) >= :min_similarity
-                ORDER BY c.embedding <=> cast(:embedding as vector)
-                LIMIT :limit
-            """)
-            result = await self.db.execute(
-                sql,
-                {
-                    "embedding": embedding_str,
-                    "clause_id": str(clause_id),
-                    "min_similarity": min_similarity,
-                    "limit": limit,
-                },
-            )
+        if user_id:
+            where_clauses.append("d.user_id = cast(:user_id as uuid)")
+            params["user_id"] = str(user_id)
+
+        where_sql = " AND ".join(where_clauses)
+
+        sql = text(f"""
+            SELECT
+                c.id,
+                c.text,
+                c.clause_type,
+                c.risk_level,
+                1 - (c.embedding <=> cast(:embedding as vector)) as similarity,
+                d.id as document_id,
+                d.original_filename as document_name
+            FROM clauses c
+            JOIN document_versions dv ON c.document_version_id = dv.id
+            JOIN documents d ON dv.document_id = d.id
+            WHERE {where_sql}
+            ORDER BY c.embedding <=> cast(:embedding as vector)
+            LIMIT :limit
+        """)
+        result = await self.db.execute(sql, params)
 
         rows = result.fetchall()
 

@@ -1,9 +1,11 @@
 """Version comparison API endpoints."""
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.auth import get_current_user, CurrentUser
 from app.api.schemas import (
     ComparisonResponse,
     ClauseChangeResponse,
@@ -12,6 +14,8 @@ from app.api.schemas import (
     ErrorResponse,
 )
 from app.services.comparison_service import ComparisonService
+from app.models.document_version import DocumentVersion
+from app.models.document import Document
 
 router = APIRouter(prefix="/compare", tags=["comparison"])
 
@@ -27,6 +31,7 @@ router = APIRouter(prefix="/compare", tags=["comparison"])
 async def compare_versions(
     version1: UUID,
     version2: UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -40,12 +45,35 @@ async def compare_versions(
     - Clause-level changes (added, removed, modified, unchanged)
     - Semantic similarity scores for modified clauses
     - Risk change summary
+
+    Requires authentication. Users can only compare versions of their own documents.
     """
     if version1 == version2:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot compare a version with itself",
         )
+
+    # Verify ownership of both versions
+    for version_id in [version1, version2]:
+        result = await db.execute(
+            select(Document.user_id)
+            .join(DocumentVersion, DocumentVersion.document_id == Document.id)
+            .where(DocumentVersion.id == version_id)
+        )
+        owner_id = result.scalar_one_or_none()
+
+        if not owner_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="One or both versions not found",
+            )
+
+        if owner_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied",
+            )
 
     service = ComparisonService(db)
     result = await service.compare_versions(version1, version2)

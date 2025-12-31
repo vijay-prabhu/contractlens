@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.auth import get_current_user, CurrentUser
 from app.services.search_service import SearchService
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -46,17 +47,21 @@ async def search_clauses(
     limit: int = Query(10, ge=1, le=50, description="Maximum results"),
     min_similarity: float = Query(0.5, ge=0.0, le=1.0, description="Minimum similarity score"),
     document_id: Optional[UUID] = Query(None, description="Filter by document ID"),
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Search for clauses semantically similar to the query.
 
     Uses OpenAI embeddings and pgvector for semantic similarity search.
+    Only searches within the current user's documents.
 
     - **q**: Search query (minimum 3 characters)
     - **limit**: Maximum number of results (1-50)
     - **min_similarity**: Minimum similarity threshold (0.0-1.0)
     - **document_id**: Optional filter to search within a specific document
+
+    Requires authentication.
     """
     service = SearchService(db)
 
@@ -65,6 +70,7 @@ async def search_clauses(
         limit=limit,
         min_similarity=min_similarity,
         document_id=document_id,
+        user_id=current_user.id,
     )
 
     return SearchResponse(
@@ -94,17 +100,21 @@ async def find_similar_clauses(
     limit: int = Query(5, ge=1, le=20, description="Maximum results"),
     min_similarity: float = Query(0.7, ge=0.0, le=1.0, description="Minimum similarity score"),
     include_same_document: bool = Query(False, description="Include clauses from same document"),
+    current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Find clauses similar to a given clause.
 
     Useful for comparing clauses across different contracts.
+    Only searches within the current user's documents.
 
     - **clause_id**: ID of the source clause
     - **limit**: Maximum number of similar clauses (1-20)
     - **min_similarity**: Minimum similarity threshold (0.0-1.0)
     - **include_same_document**: Whether to include clauses from the same document
+
+    Requires authentication.
     """
     service = SearchService(db)
 
@@ -113,6 +123,7 @@ async def find_similar_clauses(
         limit=limit,
         min_similarity=min_similarity,
         exclude_same_document=not include_same_document,
+        user_id=current_user.id,
     )
 
     return SimilarClausesResponse(

@@ -25,6 +25,7 @@ httpx = "^0.26.0"
 tenacity = "^8.2.0"
 pgvector = "^0.2.4"
 psycopg = {extras = ["binary"], version = "^3.3.2"}
+pyjwt = "^2.10.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
