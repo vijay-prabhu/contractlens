@@ -199,3 +199,67 @@ class DocumentService:
         )
 
         return list(result.scalars().all())
+
+    async def get_document_versions(
+        self, document_id: uuid.UUID
+    ) -> List[DocumentVersion]:
+        """Get all versions of a document.
+
+        Args:
+            document_id: UUID of the document
+
+        Returns:
+            List of versions ordered by version number (newest first)
+        """
+        result = await self.db.execute(
+            select(DocumentVersion)
+            .where(DocumentVersion.document_id == document_id)
+            .order_by(DocumentVersion.version_number.desc())
+        )
+        return list(result.scalars().all())
+
+    async def create_new_version(
+        self,
+        document_id: uuid.UUID,
+        storage_path: str,
+    ) -> DocumentVersion:
+        """Create a new version of a document.
+
+        Args:
+            document_id: UUID of the parent document
+            storage_path: Path in Supabase storage
+
+        Returns:
+            The created DocumentVersion
+        """
+        # Get current highest version number
+        result = await self.db.execute(
+            select(DocumentVersion.version_number)
+            .where(DocumentVersion.document_id == document_id)
+            .order_by(DocumentVersion.version_number.desc())
+            .limit(1)
+        )
+        current_version = result.scalar_one_or_none() or 0
+
+        # Create new version
+        version = DocumentVersion(
+            document_id=document_id,
+            version_number=current_version + 1,
+            storage_path=storage_path,
+        )
+        self.db.add(version)
+        await self.db.commit()
+        await self.db.refresh(version)
+
+        # Update document status to trigger reprocessing
+        await self.db.execute(
+            update(Document)
+            .where(Document.id == document_id)
+            .values(
+                status=DocumentStatus.UPLOADED.value,
+                status_message=f"Version {version.version_number} uploaded, pending processing",
+            )
+        )
+        await self.db.commit()
+
+        return version

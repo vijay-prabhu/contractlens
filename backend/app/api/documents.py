@@ -13,6 +13,9 @@ from app.api.schemas import (
     DocumentRiskAnalysis,
     RiskDistribution,
     ClauseResponse,
+    DocumentVersionResponse,
+    VersionListResponse,
+    VersionUploadResponse,
     ErrorResponse,
 )
 from app.services.document_service import DocumentService
@@ -363,4 +366,132 @@ async def delete_document(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
+        )
+
+
+# Version management endpoints
+
+
+@router.get(
+    "/{document_id}/versions",
+    response_model=VersionListResponse,
+    responses={404: {"model": ErrorResponse, "description": "Document not found"}},
+)
+async def list_versions(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List all versions of a document.
+
+    Returns versions ordered by version number (newest first).
+    """
+    service = DocumentService(db)
+    document = await service.get_document(document_id)
+
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    versions = await service.get_document_versions(document_id)
+
+    return VersionListResponse(
+        document_id=document_id,
+        versions=[
+            DocumentVersionResponse(
+                id=v.id,
+                version_number=v.version_number,
+                storage_path=v.storage_path,
+                page_count=v.page_count,
+                word_count=v.word_count,
+                created_at=v.created_at,
+            )
+            for v in versions
+        ],
+        total=len(versions),
+    )
+
+
+@router.post(
+    "/{document_id}/versions",
+    response_model=VersionUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid file"},
+        404: {"model": ErrorResponse, "description": "Document not found"},
+        500: {"model": ErrorResponse, "description": "Upload failed"},
+    },
+)
+async def upload_new_version(
+    document_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Upload a new version of an existing document.
+
+    - **file**: The new version file (must be same type as original)
+
+    The new version will be processed automatically.
+    """
+    service = DocumentService(db)
+
+    # Get existing document
+    document = await service.get_document(document_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    # Validate file
+    is_valid, error_message = service.validate_file(
+        file.filename or "unknown",
+        file.size or 0,
+    )
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message,
+        )
+
+    # Check file type matches original
+    file_type = service.get_file_type(file.filename or "unknown")
+    if file_type != document.file_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File type must match original ({document.file_type})",
+        )
+
+    # Read file content
+    file_content = await file.read()
+
+    try:
+        # Upload to storage
+        storage_path = await service.upload_to_storage(
+            file_content,
+            file.filename or "unknown",
+            file.content_type or "application/octet-stream",
+        )
+
+        # Create new version
+        version = await service.create_new_version(
+            document_id=document_id,
+            storage_path=storage_path,
+        )
+
+        return VersionUploadResponse(
+            id=version.id,
+            version_number=version.version_number,
+            document_id=document_id,
+            status="uploaded",
+            message=f"Version {version.version_number} uploaded. Processing will begin shortly.",
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload version: {str(e)}",
         )

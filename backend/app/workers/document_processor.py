@@ -58,10 +58,25 @@ class DocumentProcessor:
                     session, document, DocumentStatus.PROCESSING, "Starting processing"
                 )
 
-                # Download file from storage (files are stored in uploads/ folder)
+                # Get the latest version to process
+                version_result = await session.execute(
+                    select(DocumentVersion)
+                    .where(DocumentVersion.document_id == document_id)
+                    .order_by(DocumentVersion.version_number.desc())
+                    .limit(1)
+                )
+                document_version = version_result.scalar_one_or_none()
+
+                if not document_version:
+                    logger.error(f"No document version found for {document_id}")
+                    await self._update_status(
+                        session, document, DocumentStatus.FAILED, "No document version found"
+                    )
+                    return False
+
+                # Download file from storage using version's storage path
                 supabase = get_supabase_client()
-                storage_path = f"uploads/{document.filename}"
-                file_content = await self._download_file(supabase, storage_path)
+                file_content = await self._download_file(supabase, document_version.storage_path)
 
                 if not file_content:
                     await self._update_status(
@@ -71,7 +86,7 @@ class DocumentProcessor:
 
                 # Extract text
                 await self._update_status(
-                    session, document, DocumentStatus.EXTRACTING, "Extracting text"
+                    session, document, DocumentStatus.EXTRACTING, f"Extracting text (v{document_version.version_number})"
                 )
 
                 try:
@@ -98,22 +113,6 @@ class DocumentProcessor:
                 await self._update_status(
                     session, document, DocumentStatus.ANALYZING, "Generating embeddings and classifying clauses"
                 )
-
-                # Get document version for clause association
-                version_result = await session.execute(
-                    select(DocumentVersion)
-                    .where(DocumentVersion.document_id == document_id)
-                    .order_by(DocumentVersion.version_number.desc())
-                    .limit(1)
-                )
-                document_version = version_result.scalar_one_or_none()
-
-                if not document_version:
-                    logger.error(f"No document version found for {document_id}")
-                    await self._update_status(
-                        session, document, DocumentStatus.FAILED, "No document version found"
-                    )
-                    return False
 
                 # Update document version with extracted text
                 document_version.extracted_text = extraction_result.text
