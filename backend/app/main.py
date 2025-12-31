@@ -12,6 +12,7 @@ from app.core.exceptions import (
     general_exception_handler,
 )
 from app.api.documents import router as documents_router
+from app.api.search import router as search_router
 from app.workers import start_processor, stop_processor
 
 settings = get_settings()
@@ -60,6 +61,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(documents_router, prefix="/api/v1")
+app.include_router(search_router, prefix="/api/v1")
 
 
 @app.get("/")

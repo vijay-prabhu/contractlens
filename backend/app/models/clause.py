@@ -84,4 +84,4 @@ class Clause(Base, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<Clause {self.clause_type.value} ({self.risk_level.value})>"
+        return f"<Clause {self.clause_type} ({self.risk_level})>"

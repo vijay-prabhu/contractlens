@@ -2,16 +2,20 @@
 import asyncio
 import logging
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import async_session_maker
 from app.core.supabase import get_supabase_client
 from app.models.document import Document, DocumentStatus
+from app.models.document_version import DocumentVersion
+from app.models.clause import Clause
 from app.services.extraction_service import ExtractionService
-from app.services.chunking_service import ChunkingService
+from app.services.chunking_service import ChunkingService, TextChunk
+from app.services.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +26,7 @@ class DocumentProcessor:
     def __init__(self):
         self.extraction_service = ExtractionService()
         self.chunking_service = ChunkingService()
+        self.embedding_service = EmbeddingService()
         self._running = False
         self._task: Optional[asyncio.Task] = None
 
@@ -87,16 +92,47 @@ class DocumentProcessor:
                     },
                 )
 
-                # Store extracted text and metadata
+                # Update status to analyzing
+                await self._update_status(
+                    session, document, DocumentStatus.ANALYZING, "Generating embeddings"
+                )
+
+                # Get document version for clause association
+                version_result = await session.execute(
+                    select(DocumentVersion)
+                    .where(DocumentVersion.document_id == document_id)
+                    .order_by(DocumentVersion.version_number.desc())
+                    .limit(1)
+                )
+                document_version = version_result.scalar_one_or_none()
+
+                if not document_version:
+                    logger.error(f"No document version found for {document_id}")
+                    await self._update_status(
+                        session, document, DocumentStatus.FAILED, "No document version found"
+                    )
+                    return False
+
+                # Update document version with extracted text
+                document_version.extracted_text = extraction_result.text
+                document_version.page_count = extraction_result.page_count
+                document_version.word_count = len(extraction_result.text.split())
+
+                # Generate embeddings and create clauses
+                clauses_created = await self._create_clauses_with_embeddings(
+                    session, document_version.id, chunks
+                )
+
+                # Store extracted text and metadata on document
                 document.extracted_text = extraction_result.text
                 document.page_count = extraction_result.page_count
                 document.chunk_count = len(chunks)
                 document.word_count = len(extraction_result.text.split())
                 document.status = DocumentStatus.COMPLETED.value
-                document.status_message = f"Extracted {extraction_result.page_count} pages, {len(chunks)} chunks"
+                document.status_message = f"Processed {extraction_result.page_count} pages, {clauses_created} clauses with embeddings"
 
                 await session.commit()
-                logger.info(f"Document {document_id} processed successfully")
+                logger.info(f"Document {document_id} processed successfully with {clauses_created} clauses")
                 return True
 
             except Exception as e:
@@ -125,6 +161,55 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Failed to download {filename}: {e}")
             return None
+
+    async def _create_clauses_with_embeddings(
+        self,
+        session: AsyncSession,
+        document_version_id: uuid.UUID,
+        chunks: List[TextChunk],
+    ) -> int:
+        """Create clause records with embeddings for each chunk.
+
+        Args:
+            session: Database session
+            document_version_id: ID of the document version
+            chunks: List of text chunks
+
+        Returns:
+            Number of clauses created
+        """
+        if not chunks:
+            return 0
+
+        # Extract text from chunks for batch embedding
+        chunk_texts = [chunk.content for chunk in chunks]
+
+        try:
+            # Generate embeddings in batch
+            embeddings = self.embedding_service.generate_embeddings(chunk_texts)
+        except Exception as e:
+            logger.error(f"Failed to generate embeddings: {e}")
+            # Continue without embeddings if API fails
+            embeddings = [None] * len(chunks)
+
+        # Create clause records
+        clauses_created = 0
+        for chunk, embedding in zip(chunks, embeddings):
+            clause = Clause(
+                text=chunk.content,
+                clause_type="other",  # Will be classified in Day 4
+                risk_level="low",     # Will be scored in Day 4
+                risk_score=0.0,
+                start_position=chunk.start_char,
+                end_position=chunk.end_char,
+                embedding=embedding,
+                document_version_id=document_version_id,
+            )
+            session.add(clause)
+            clauses_created += 1
+
+        logger.info(f"Created {clauses_created} clauses with embeddings")
+        return clauses_created
 
     async def start_background_worker(self, poll_interval: int = 5) -> None:
         """Start background worker that polls for pending documents.
