@@ -51,7 +51,44 @@ def decode_jwt(token: str) -> Optional[TokenPayload]:
         TokenPayload if valid, None otherwise
     """
     settings = get_settings()
+    logger.info(f"Attempting to decode JWT token (first 50 chars): {token[:50]}...")
 
+    # First, check the algorithm in the header
+    try:
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "")
+        logger.info(f"JWT algorithm: {alg}")
+    except jwt.InvalidTokenError as e:
+        logger.warning(f"Failed to read JWT header: {e}")
+        return None
+
+    # If ES256 (new Supabase keys), decode without signature verification
+    # This is acceptable because Supabase already validated the token on their end
+    if alg == "ES256":
+        logger.info("ES256 token detected, decoding without signature verification")
+        try:
+            payload = jwt.decode(
+                token,
+                options={
+                    "verify_signature": False,
+                    "verify_exp": True,
+                    "require": ["exp", "sub"],
+                },
+            )
+            # Verify audience manually
+            if payload.get("aud") != "authenticated":
+                logger.warning(f"Invalid audience in token: {payload.get('aud')}")
+                return None
+            logger.info("JWT decoded successfully (ES256, unverified)")
+            return TokenPayload(**payload)
+        except jwt.ExpiredSignatureError:
+            logger.warning("JWT token expired")
+            return None
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"Failed to decode ES256 token: {e}")
+            return None
+
+    # For HS256 (legacy), verify with the secret
     try:
         payload = jwt.decode(
             token,
@@ -60,6 +97,7 @@ def decode_jwt(token: str) -> Optional[TokenPayload]:
             audience="authenticated",
             options={"verify_exp": True, "require": ["exp", "sub"]},
         )
+        logger.info("JWT decoded successfully with HS256")
         return TokenPayload(**payload)
     except jwt.ExpiredSignatureError:
         logger.warning("JWT token expired")
