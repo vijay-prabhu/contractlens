@@ -10,16 +10,35 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+// Cache for auth token to avoid repeated getSession calls
+let cachedToken: string | null = null
+let tokenExpiry: number = 0
+
 async function getAuthHeaders(): Promise<HeadersInit> {
+  // Use cached token if still valid (with 60 second buffer)
+  const now = Date.now()
+  if (cachedToken && tokenExpiry > now + 60000) {
+    return {
+      'Authorization': `Bearer ${cachedToken}`,
+      'Content-Type': 'application/json',
+    }
+  }
+
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
   if (!session?.access_token) {
+    cachedToken = null
+    tokenExpiry = 0
     throw new Error('Not authenticated')
   }
 
+  // Cache the token
+  cachedToken = session.access_token
+  tokenExpiry = session.expires_at ? session.expires_at * 1000 : now + 3600000
+
   return {
-    'Authorization': `Bearer ${session.access_token}`,
+    'Authorization': `Bearer ${cachedToken}`,
     'Content-Type': 'application/json',
   }
 }

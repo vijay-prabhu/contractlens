@@ -7,7 +7,9 @@ from typing import Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-logger = logging.getLogger(__name__)
+# Use root logger to ensure logs appear
+logger = logging.getLogger("app.middleware")
+logger.setLevel(logging.INFO)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):

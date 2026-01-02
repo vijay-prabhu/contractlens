@@ -93,8 +93,14 @@ export default function DocumentDetailPage() {
 
           // Fetch versions separately (non-blocking)
           api.documents.getVersions(id)
-            .then(versionsData => setVersions(versionsData.versions))
-            .catch(() => {/* Versions are optional */})
+            .then(versionsData => {
+              console.log('Versions loaded:', versionsData.versions.length)
+              setVersions(versionsData.versions)
+            })
+            .catch((err) => {
+              console.error('Failed to load versions:', err)
+              // Versions are optional, so don't block the page
+            })
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load document')
