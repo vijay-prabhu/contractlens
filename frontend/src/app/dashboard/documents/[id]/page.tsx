@@ -16,7 +16,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { api } from '@/lib/api'
-import { cn, formatDate, formatFileSize, getRiskColor, getStatusColor } from '@/lib/utils'
+import { cn, formatDate, formatFileSize, getStatusColor } from '@/lib/utils'
 import type { Document, DocumentAnalysis, RiskLevel } from '@/types'
 
 const riskIcons: Record<RiskLevel, typeof AlertTriangle> = {
