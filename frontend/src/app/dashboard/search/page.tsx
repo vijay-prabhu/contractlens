@@ -106,7 +106,7 @@ export default function SearchPage() {
     try {
       const response = await api.search.clauses(query, {
         limit: 20,
-        minSimilarity: 0.5,
+        minSimilarity: 0.3,  // Lower threshold for single-word queries
         documentId: selectedDocumentId || undefined,
       })
       setResults(response.results)
