@@ -167,24 +167,49 @@ Key technical decisions are documented in Architecture Decision Records (ADRs):
 
 ## Future Enhancements
 
-### High Priority
-- [ ] Search page with semantic search UI
-- [ ] Version comparison diff view (side-by-side)
-- [ ] Filter clauses by risk level
-- [ ] Expand/collapse clause text
-- [ ] Toast notifications
+### Completed
+- [x] Search page with semantic search UI
+- [x] Version comparison diff view (side-by-side)
 
-### Medium Priority
-- [ ] Redis caching for embeddings and analysis results
-- [ ] WebSocket for real-time processing updates
+### High Priority (UX Improvements)
+- [ ] Expand/collapse clause text in analysis view
+- [ ] Filter clauses by risk level (Critical/High/Medium/Low)
+- [ ] Toast notifications for user feedback
+- [ ] Progress bar during document processing
+- [ ] Add recommendations to clause analysis output
+
+### Medium Priority (Features)
 - [ ] Export analysis to PDF report
 - [ ] Batch upload for multiple files
+- [ ] Clause highlighting in original document preview
+- [ ] User settings/profile page
+- [ ] Dark mode toggle
+- [ ] WebSocket for real-time processing updates
 
-### Technical Improvements
+### Low Priority (Nice-to-Have)
+- [ ] Real-time collaboration
+- [ ] Custom risk thresholds per user
+- [ ] Contract templates library
+- [ ] AI-powered contract drafting suggestions
+- [ ] Integration with DocuSign/Adobe Sign
+- [ ] Mobile app (React Native)
+
+### Pre-Deployment (Production Readiness)
+- [ ] Sentry.io integration (Frontend + Backend error tracking)
+- [ ] Performance monitoring with Sentry tracing
 - [ ] E2E tests with Playwright
-- [ ] CI/CD pipeline
+- [ ] CI/CD pipeline (GitHub Actions)
 - [ ] Rate limiting on API endpoints
-- [ ] Production deployment
+- [ ] Deploy to Vercel (Frontend) + Supabase production
+
+### Technical Debt
+- [ ] Proper ES256 JWT verification with Supabase public key
+- [ ] Redis caching for embeddings and analysis results
+- [ ] Better error handling and retry logic for OpenAI calls
+- [ ] Optimize API response times (database connection pooling)
+- [ ] Response caching for frequently accessed data
+- [ ] Loading skeletons for better perceived performance
+- [ ] Lazy load clause list for large documents
 
 ## Key Learnings
 
