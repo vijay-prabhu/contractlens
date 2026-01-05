@@ -17,11 +17,14 @@ import {
   GitCompare,
   History,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Upload,
   HelpCircle,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn, formatDate, formatFileSize, getStatusColor } from '@/lib/utils'
+import { useToast } from '@/components/toast'
 import type { Document, DocumentAnalysis, DocumentVersion, RiskLevel } from '@/types'
 
 const riskIcons: Record<RiskLevel, typeof AlertTriangle> = {
@@ -69,6 +72,7 @@ const riskBorderStyles: Record<RiskLevel, string> = {
 export default function DocumentDetailPage() {
   const params = useParams()
   const id = params.id as string
+  const { showToast } = useToast()
   const [document, setDocument] = useState<Document | null>(null)
   const [analysis, setAnalysis] = useState<DocumentAnalysis | null>(null)
   const [versions, setVersions] = useState<DocumentVersion[]>([])
@@ -78,7 +82,21 @@ export default function DocumentDetailPage() {
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
   const [uploadingVersion, setUploadingVersion] = useState(false)
   const [showVersionHelp, setShowVersionHelp] = useState(false)
+  const [expandedClauses, setExpandedClauses] = useState<Set<string>>(new Set())
+  const [riskFilter, setRiskFilter] = useState<RiskLevel | 'all'>('all')
   const versionFileInputRef = useRef<HTMLInputElement>(null)
+
+  const toggleClauseExpanded = (clauseId: string) => {
+    setExpandedClauses((prev) => {
+      const next = new Set(prev)
+      if (next.has(clauseId)) {
+        next.delete(clauseId)
+      } else {
+        next.add(clauseId)
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -125,11 +143,14 @@ export default function DocumentDetailPage() {
         if (doc.status === 'completed') {
           const analysisData = await api.documents.getAnalysis(id)
           setAnalysis(analysisData)
+          // Also fetch versions when processing completes
+          const versionsData = await api.documents.getVersions(id)
+          setVersions(versionsData.versions)
         }
       } catch {
         // Ignore polling errors
       }
-    }, 3000)
+    }, 1500) // Poll every 1.5s during processing for smoother progress updates
 
     return () => clearInterval(interval)
   }, [id, document])
@@ -138,11 +159,19 @@ export default function DocumentDetailPage() {
     if (!document) return
     setReprocessing(true)
     try {
-      const updated = await api.documents.process(document.id)
-      setDocument(updated)
+      // Clear analysis to show progress bar
       setAnalysis(null)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to reprocess document')
+      // Update document status locally - start at extracting since file is already uploaded
+      setDocument({ ...document, status: 'extracting' as const, status_message: 'Extracting text for reprocessing...' })
+      showToast('Reprocessing started', 'success')
+
+      // Fire and forget - let the API process in background
+      // The polling useEffect will pick up status changes
+      api.documents.process(document.id).catch((err) => {
+        showToast(err instanceof Error ? err.message : 'Failed to reprocess document', 'error')
+        // Refresh to get actual status on error
+        api.documents.get(document.id).then(setDocument)
+      })
     } finally {
       setReprocessing(false)
     }
@@ -168,11 +197,16 @@ export default function DocumentDetailPage() {
     setUploadingVersion(true)
     try {
       await api.documents.uploadVersion(document.id, file)
+      // Clear analysis since new version needs processing
+      setAnalysis(null)
+      // Set status locally to show progress bar immediately (starts at extracting)
+      setDocument({ ...document, status: 'extracting' as const, status_message: 'Processing new version...' })
       // Refresh versions list
       const versionsData = await api.documents.getVersions(document.id)
       setVersions(versionsData.versions)
+      showToast('New version uploaded - processing started', 'success')
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to upload version')
+      showToast(err instanceof Error ? err.message : 'Failed to upload version', 'error')
     } finally {
       setUploadingVersion(false)
       // Reset the input
@@ -253,7 +287,7 @@ export default function DocumentDetailPage() {
                 {document.original_filename}
               </h1>
               <p className="text-sm text-gray-500 mt-1">
-                {formatFileSize(document.file_size)} • {document.file_type.toUpperCase()} • Uploaded {formatDate(document.created_at)}
+                {formatFileSize(document.file_size)} • {document.file_type?.toUpperCase() || 'FILE'} • Uploaded {formatDate(document.created_at)}
               </p>
             </div>
           </div>
@@ -310,21 +344,56 @@ export default function DocumentDetailPage() {
       </div>
 
       {/* Processing State */}
-      {isProcessing && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-          <Loader2 className="h-8 w-8 text-blue-600 animate-spin mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">
-            Analyzing Document
-          </h3>
-          <p className="text-sm text-gray-600">
-            {document.status === 'extracting'
-              ? 'Extracting text from your document...'
-              : document.status === 'analyzing'
-              ? 'Running AI risk analysis on contract clauses...'
-              : 'Processing your document...'}
-          </p>
-        </div>
-      )}
+      {isProcessing && (() => {
+        const progressMap: Record<string, number> = {
+          uploaded: 5,
+          processing: 15,
+          extracting: 40,
+          analyzing: 75,
+        }
+        const progress = progressMap[document.status] || 10
+        const statusTextMap: Record<string, string> = {
+          uploaded: 'Preparing document...',
+          processing: 'Starting document processing...',
+          extracting: 'Extracting text from your document...',
+          analyzing: 'Running AI risk analysis on contract clauses...',
+        }
+        const statusText = statusTextMap[document.status] || 'Processing your document...'
+
+        return (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-center justify-center mb-4">
+              <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2 text-center">
+              Analyzing Document
+            </h3>
+            <p className="text-sm text-gray-600 text-center mb-4">
+              {statusText}
+            </p>
+
+            {/* Progress Bar */}
+            <div className="max-w-md mx-auto">
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                <span>{document.status.charAt(0).toUpperCase() + document.status.slice(1)}</span>
+                <span>{progress}%</span>
+              </div>
+              <div className="h-2 bg-blue-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-400 mt-2">
+                <span>Upload</span>
+                <span>Extract</span>
+                <span>Analyze</span>
+                <span>Complete</span>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Failed State */}
       {isFailed && (
@@ -356,9 +425,16 @@ export default function DocumentDetailPage() {
         <div className="space-y-6">
           {/* Risk Summary */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Risk Summary
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Risk Summary
+              </h2>
+              {versions.length > 0 && (
+                <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  Version {versions[0].version_number}
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {(['critical', 'high', 'medium', 'low'] as RiskLevel[]).map((level) => {
                 const count = analysis.clauses.filter((c) => c.risk_level === level).length
@@ -517,17 +593,70 @@ export default function DocumentDetailPage() {
 
           {/* Clauses List */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Analyzed Clauses ({analysis.clauses.length})
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Analyzed Clauses ({analysis.clauses.length})
+              </h2>
+              {versions.length > 0 && (
+                <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  Version {versions[0].version_number}
+                </span>
+              )}
+            </div>
+
+            {/* Risk Level Filter */}
+            <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-gray-200">
+              {(['all', 'critical', 'high', 'medium', 'low'] as const).map((level) => {
+                const count = level === 'all'
+                  ? analysis.clauses.length
+                  : analysis.clauses.filter((c) => c.risk_level === level).length
+                const isActive = riskFilter === level
+                return (
+                  <button
+                    key={level}
+                    onClick={() => setRiskFilter(level)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                      isActive
+                        ? level === 'all'
+                          ? 'bg-gray-900 text-white'
+                          : level === 'critical'
+                          ? 'bg-red-600 text-white'
+                          : level === 'high'
+                          ? 'bg-orange-500 text-white'
+                          : level === 'medium'
+                          ? 'bg-yellow-500 text-white'
+                          : 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    )}
+                  >
+                    {level === 'all' ? 'All' : level.charAt(0).toUpperCase() + level.slice(1)} ({count})
+                  </button>
+                )
+              })}
+            </div>
+
             <div className="space-y-4">
               {analysis.clauses.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">
                   No clauses found in this document.
                 </p>
               ) : (
-                analysis.clauses.map((clause) => {
-                  const Icon = riskIcons[clause.risk_level]
+                (() => {
+                  const filteredClauses = analysis.clauses.filter(
+                    (clause) => riskFilter === 'all' || clause.risk_level === riskFilter
+                  )
+                  if (filteredClauses.length === 0) {
+                    return (
+                      <p className="text-gray-500 text-center py-4">
+                        No {riskFilter} risk clauses found.
+                      </p>
+                    )
+                  }
+                  return filteredClauses.map((clause) => {
+                    const Icon = riskIcons[clause.risk_level]
+                  const isExpanded = expandedClauses.has(clause.id)
+                  const isLongText = clause.text.length > 200
                   return (
                     <div
                       key={clause.id}
@@ -551,9 +680,33 @@ export default function DocumentDetailPage() {
                         </div>
                       </div>
 
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-3">
+                      <p className={cn(
+                        'text-sm text-gray-600',
+                        !isExpanded && isLongText && 'line-clamp-3'
+                      )}>
                         {clause.text}
                       </p>
+
+                      {isLongText && (
+                        <button
+                          onClick={() => toggleClauseExpanded(clause.id)}
+                          className="mt-2 mb-3 inline-flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          {isExpanded ? (
+                            <>
+                              <ChevronUp className="h-4 w-4 mr-1" />
+                              Show less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4 mr-1" />
+                              Show more
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {!isLongText && <div className="mb-3" />}
 
                       {clause.risk_explanation && (
                         <div className="bg-gray-50 rounded-md p-3 mb-3">
@@ -580,8 +733,9 @@ export default function DocumentDetailPage() {
                         </div>
                       )}
                     </div>
-                  )
-                })
+                    )
+                  })
+                })()
               )}
             </div>
           </div>

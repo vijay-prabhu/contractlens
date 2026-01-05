@@ -1,5 +1,6 @@
 """Background document processing worker."""
 import asyncio
+import json
 import logging
 import uuid
 from typing import Optional, List
@@ -209,6 +210,7 @@ class DocumentProcessor:
                     risk_score=0.0,
                     risk_explanation="Classification unavailable",
                     confidence=0.0,
+                    recommendations=[],
                 )
                 for _ in chunks
             ]
@@ -222,6 +224,7 @@ class DocumentProcessor:
                 risk_level=classification.risk_level,
                 risk_score=classification.risk_score,
                 risk_explanation=classification.risk_explanation,
+                recommendations=json.dumps(classification.recommendations) if classification.recommendations else None,
                 start_position=chunk.start_char,
                 end_position=chunk.end_char,
                 embedding=embedding,
@@ -240,11 +243,11 @@ class DocumentProcessor:
 
         return clauses_created
 
-    async def start_background_worker(self, poll_interval: int = 5) -> None:
+    async def start_background_worker(self, poll_interval: int = 15) -> None:
         """Start background worker that polls for pending documents.
 
         Args:
-            poll_interval: Seconds between polls for new documents
+            poll_interval: Seconds between polls for new documents (default 15s to reduce connection pressure)
         """
         self._running = True
         logger.info("Document processor started")
@@ -260,6 +263,8 @@ class DocumentProcessor:
                         .limit(1)
                     )
                     document = result.scalar_one_or_none()
+                    # Explicitly close the result to release connection faster
+                    await session.commit()
 
                     if document:
                         logger.info(f"Processing document: {document.id}")

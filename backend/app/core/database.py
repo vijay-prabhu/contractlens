@@ -30,10 +30,19 @@ async_session_maker = async_sessionmaker(
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency for getting async database sessions."""
+    """Dependency for getting async database sessions.
+
+    Ensures proper transaction cleanup for Supabase Transaction Pooler.
+    """
     async with async_session_maker() as session:
         try:
             yield session
+            # Commit any pending changes
+            await session.commit()
+        except Exception:
+            # Rollback on error
+            await session.rollback()
+            raise
         finally:
             await session.close()
 

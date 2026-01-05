@@ -171,30 +171,37 @@ class DocumentService:
         return True
 
     async def get_document_clauses(
-        self, document_id: uuid.UUID
+        self, document_id: uuid.UUID, version_id: Optional[uuid.UUID] = None
     ) -> List[Clause]:
         """Get all clauses for a document.
 
         Args:
             document_id: UUID of the document
+            version_id: Optional specific version ID. If not provided, uses latest version.
 
         Returns:
-            List of clauses ordered by position
+            List of clauses ordered by risk score (highest first)
         """
-        # First get the document version(s)
-        result = await self.db.execute(
-            select(DocumentVersion.id)
-            .where(DocumentVersion.document_id == document_id)
-        )
-        version_ids = [row[0] for row in result.fetchall()]
+        # Get the specific version or latest version
+        if version_id:
+            target_version_id = version_id
+        else:
+            # Get the latest version
+            result = await self.db.execute(
+                select(DocumentVersion.id)
+                .where(DocumentVersion.document_id == document_id)
+                .order_by(DocumentVersion.version_number.desc())
+                .limit(1)
+            )
+            target_version_id = result.scalar_one_or_none()
 
-        if not version_ids:
+        if not target_version_id:
             return []
 
-        # Get clauses for those versions, ordered by risk score (highest first)
+        # Get clauses for the target version, ordered by risk score (highest first)
         result = await self.db.execute(
             select(Clause)
-            .where(Clause.document_version_id.in_(version_ids))
+            .where(Clause.document_version_id == target_version_id)
             .order_by(Clause.risk_score.desc(), Clause.start_position)
         )
 

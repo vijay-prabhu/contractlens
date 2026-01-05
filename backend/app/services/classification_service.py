@@ -26,6 +26,7 @@ class ClassificationResult:
     risk_score: float  # 0.0 to 1.0
     risk_explanation: str
     confidence: float  # 0.0 to 1.0
+    recommendations: List[str]  # List of actionable recommendations
 
 
 # Risk weights by clause type - higher weight = inherently riskier clause type
@@ -55,6 +56,7 @@ Your task is to analyze contract clauses and provide:
 2. Risk level assessment
 3. Numerical risk score
 4. Brief risk explanation
+5. Actionable recommendations (for medium/high/critical risk clauses)
 
 ## Clause Types (choose one):
 - indemnification: Clauses about protecting parties from losses, damages, or liabilities
@@ -91,13 +93,20 @@ Consider these when assessing risk:
 - Missing important protections
 - Ambiguous or vague language
 
+## Recommendations Guidelines:
+- For low risk: provide empty array []
+- For medium/high/critical risk: provide 1-3 specific, actionable recommendations
+- Focus on what can be negotiated or changed
+- Be concise but specific (e.g., "Add a liability cap of 2x annual fees" not "Consider limiting liability")
+
 Respond ONLY with valid JSON in this exact format:
 {
     "clause_type": "<type>",
     "risk_level": "<level>",
     "risk_score": <0.0-1.0>,
     "risk_explanation": "<1-2 sentence explanation>",
-    "confidence": <0.0-1.0>
+    "confidence": <0.0-1.0>,
+    "recommendations": ["<recommendation 1>", "<recommendation 2>"]
 }"""
 
 
@@ -124,6 +133,7 @@ class ClassificationService:
                 risk_score=0.0,
                 risk_explanation="Empty or whitespace-only text",
                 confidence=0.0,
+                recommendations=[],
             )
 
         try:
@@ -156,6 +166,7 @@ class ClassificationService:
                 risk_score=0.0,
                 risk_explanation=f"Classification error: {str(e)}",
                 confidence=0.0,
+                recommendations=[],
             )
 
     def classify_clauses_batch(
@@ -185,6 +196,7 @@ class ClassificationService:
                     risk_score=0.0,
                     risk_explanation=f"Classification error: {str(e)}",
                     confidence=0.0,
+                    recommendations=[],
                 ))
 
         return results
@@ -239,12 +251,20 @@ class ClassificationService:
         if not isinstance(risk_explanation, str):
             risk_explanation = str(risk_explanation)
 
+        # Get recommendations
+        recommendations = parsed.get("recommendations", [])
+        if not isinstance(recommendations, list):
+            recommendations = []
+        # Ensure all items are strings and limit to 3
+        recommendations = [str(r) for r in recommendations if r][:3]
+
         return ClassificationResult(
             clause_type=clause_type,
             risk_level=risk_level,
             risk_score=round(adjusted_score, 3),
             risk_explanation=risk_explanation,
             confidence=confidence,
+            recommendations=recommendations,
         )
 
     def calculate_document_risk_summary(

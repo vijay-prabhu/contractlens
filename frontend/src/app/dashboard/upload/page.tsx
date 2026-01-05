@@ -73,11 +73,12 @@ export default function UploadPage() {
     setError(null)
 
     try {
-      await api.documents.upload(file)
+      const document = await api.documents.upload(file)
       setSuccess(true)
+      // Redirect to document detail page to show processing progress
       setTimeout(() => {
-        router.push('/dashboard')
-      }, 1500)
+        router.push(`/dashboard/documents/${document.id}`)
+      }, 1000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
@@ -101,7 +102,7 @@ export default function UploadPage() {
             Upload Successful!
           </h2>
           <p className="text-gray-500">
-            Your document is being processed. Redirecting...
+            Redirecting to view processing progress...
           </p>
         </div>
       </div>

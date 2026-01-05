@@ -1,6 +1,7 @@
 from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -295,6 +296,7 @@ async def get_document_analysis(
             risk_level=c.risk_level,
             risk_score=c.risk_score,
             risk_explanation=c.risk_explanation,
+            recommendations=c.recommendations,
             start_position=c.start_position,
             end_position=c.end_position,
             page_number=c.page_number,
@@ -345,18 +347,25 @@ async def process_document(
             detail="Access denied",
         )
 
-    if document.status == "completed":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Document has already been processed",
-        )
-
     if document.status in ["processing", "extracting", "analyzing"]:
         return DocumentProcessResponse(
             id=document.id,
             status=document.status,
             message="Document is already being processed",
         )
+
+    # For reprocessing completed documents, delete existing clauses first
+    if document.status == "completed":
+        # Get latest version and delete its clauses
+        versions = await service.get_document_versions(document_id)
+        if versions:
+            latest_version = versions[0]  # Already sorted by version_number desc
+            # Delete existing clauses for this version
+            from app.models.clause import Clause
+            await db.execute(
+                delete(Clause).where(Clause.document_version_id == latest_version.id)
+            )
+            await db.commit()
 
     # Trigger processing
     success = await processor.process_document(document_id)

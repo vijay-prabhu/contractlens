@@ -1,6 +1,7 @@
+import json
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
 
 from app.models.document import DocumentStatus
@@ -99,10 +100,24 @@ class ClauseResponse(BaseModel):
     risk_level: str
     risk_score: float
     risk_explanation: Optional[str] = None
+    recommendations: Optional[List[str]] = None
     start_position: int
     end_position: int
     page_number: Optional[int] = None
     created_at: datetime
+
+    @field_validator('recommendations', mode='before')
+    @classmethod
+    def parse_recommendations(cls, v):
+        """Parse recommendations from JSON string if stored as string."""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return []
+        return v if isinstance(v, list) else []
 
     class Config:
         from_attributes = True

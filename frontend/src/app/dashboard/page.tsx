@@ -1,23 +1,28 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Upload, FileText, RefreshCw, AlertCircle } from 'lucide-react'
 import { api } from '@/lib/api'
 import { DocumentCard } from '@/components/document-card'
+import { useToast } from '@/components/toast'
 import type { Document } from '@/types'
 
 export default function DashboardPage() {
+  const { showToast } = useToast()
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  // Use ref to track documents for polling without triggering re-renders
+  const documentsRef = useRef<Document[]>([])
 
   const fetchDocuments = useCallback(async () => {
     try {
       setError(null)
       const response = await api.documents.list()
       setDocuments(response.documents)
+      documentsRef.current = response.documents
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load documents')
     } finally {
@@ -28,18 +33,18 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDocuments()
 
-    // Poll for updates on processing documents
+    // Poll for updates on processing documents (every 10 seconds)
     const interval = setInterval(() => {
-      const hasProcessing = documents.some((doc) =>
+      const hasProcessing = documentsRef.current.some((doc) =>
         ['uploaded', 'processing', 'extracting', 'analyzing'].includes(doc.status)
       )
       if (hasProcessing) {
         fetchDocuments()
       }
-    }, 5000)
+    }, 10000)
 
     return () => clearInterval(interval)
-  }, [fetchDocuments, documents])
+  }, [fetchDocuments])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this document?')) {
@@ -50,8 +55,9 @@ export default function DashboardPage() {
     try {
       await api.documents.delete(id)
       setDocuments((prev) => prev.filter((doc) => doc.id !== id))
+      showToast('Document deleted successfully', 'success')
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete document')
+      showToast(err instanceof Error ? err.message : 'Failed to delete document', 'error')
     } finally {
       setDeleting(null)
     }
