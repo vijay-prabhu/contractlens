@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -22,6 +23,9 @@ class Settings(BaseSettings):
 
     # Redis (optional)
     redis_url: str = "redis://localhost:6379"
+
+    # Sentry (optional - for error tracking)
+    sentry_dsn: Optional[str] = None
 
     class Config:
         env_file = ".env"

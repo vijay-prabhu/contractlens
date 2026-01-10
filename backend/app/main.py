@@ -1,12 +1,28 @@
 import logging
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import get_settings
+
+# Initialize Sentry for error tracking
+settings = get_settings()
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        # Set traces_sample_rate to 1.0 to capture 100% of transactions for tracing
+        traces_sample_rate=1.0,
+        # Set profiles_sample_rate to 1.0 to profile 100% of sampled transactions
+        profiles_sample_rate=1.0,
+        # Add environment tag
+        environment=settings.environment,
+        # Send default PII (be careful in production with real user data)
+        send_default_pii=False,
+    )
 
 # Configure logging
 logging.basicConfig(
@@ -26,8 +42,6 @@ from app.api.documents import router as documents_router
 from app.api.search import router as search_router
 from app.api.comparison import router as comparison_router
 from app.workers import start_processor, stop_processor
-
-settings = get_settings()
 
 
 @asynccontextmanager
