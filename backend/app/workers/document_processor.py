@@ -5,7 +5,8 @@ import logging
 import uuid
 from typing import Optional, List
 
-from sqlalchemy import select
+from datetime import datetime, timedelta, timezone
+from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -255,10 +256,26 @@ class DocumentProcessor:
         while self._running:
             try:
                 async with async_session_maker() as session:
-                    # Find documents waiting to be processed
+                    # Find documents waiting to be processed:
+                    # 1. Documents with 'uploaded' status (new uploads)
+                    # 2. Documents stuck in intermediate states for > 2 minutes (failed/crashed processing)
+                    stuck_threshold = datetime.now(timezone.utc) - timedelta(minutes=2)
+                    intermediate_statuses = [
+                        DocumentStatus.PROCESSING.value,
+                        DocumentStatus.EXTRACTING.value,
+                        DocumentStatus.ANALYZING.value,
+                    ]
                     result = await session.execute(
                         select(Document)
-                        .where(Document.status == DocumentStatus.UPLOADED.value)
+                        .where(
+                            or_(
+                                Document.status == DocumentStatus.UPLOADED.value,
+                                and_(
+                                    Document.status.in_(intermediate_statuses),
+                                    Document.updated_at < stuck_threshold
+                                )
+                            )
+                        )
                         .order_by(Document.created_at)
                         .limit(1)
                     )

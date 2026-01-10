@@ -131,12 +131,19 @@ export default function DocumentDetailPage() {
   }, [id])
 
   // Poll for updates if document is still processing
+  // Uses a ref to prevent overlapping requests
+  const isPollingRef = useRef(false)
+
   useEffect(() => {
     if (!document || !['uploaded', 'processing', 'extracting', 'analyzing'].includes(document.status)) {
       return
     }
 
-    const interval = setInterval(async () => {
+    const poll = async () => {
+      // Skip if a request is already in progress
+      if (isPollingRef.current) return
+
+      isPollingRef.current = true
       try {
         const doc = await api.documents.get(id)
         setDocument(doc)
@@ -149,10 +156,17 @@ export default function DocumentDetailPage() {
         }
       } catch {
         // Ignore polling errors
+      } finally {
+        isPollingRef.current = false
       }
-    }, 1500) // Poll every 1.5s during processing for smoother progress updates
+    }
 
-    return () => clearInterval(interval)
+    const interval = setInterval(poll, 2000) // Poll every 2s with request deduplication
+
+    return () => {
+      clearInterval(interval)
+      isPollingRef.current = false
+    }
   }, [id, document])
 
   const handleReprocess = async () => {
@@ -253,7 +267,7 @@ export default function DocumentDetailPage() {
     )
   }
 
-  const isProcessing = ['processing', 'extracting', 'analyzing'].includes(document.status)
+  const isProcessing = ['uploaded', 'processing', 'extracting', 'analyzing'].includes(document.status)
   const isCompleted = document.status === 'completed'
   const isFailed = document.status === 'failed'
 
