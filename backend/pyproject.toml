@@ -3,6 +3,7 @@ name = "contractlens-backend"
 version = "0.1.0"
 description = "AI-powered contract review and risk analysis API"
 authors = ["Vijay Prabhu <vijayprabhumarikkani@gmail.com>"]
+license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]

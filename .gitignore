@@ -2,6 +2,12 @@
 .env*
 !.env.example
 
+# Internal docs (not for public)
+INTERNAL.md
+
+# Generated index
+index.json
+
 # Secrets & credentials
 *.key
 *.pem
