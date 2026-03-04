@@ -168,11 +168,13 @@ def calculate_risk_delta(v1_clauses: list, v2_clauses: list) -> RiskDelta:
 - **Threshold sensitivity**: Fixed thresholds may not work for all document types
 - **Embedding limitations**: Very short clauses may have less reliable embeddings
 - **No clause splitting detection**: If one clause is split into two, detection is imperfect
+- **Chunk-level granularity mismatch**: See [Addendum — Findings from Real-World Testing](#addendum--findings-from-real-world-testing) below
 
 ### Trade-offs Accepted
 
 - Using fixed thresholds rather than learning user preferences (simplicity over personalization)
 - Greedy matching algorithm rather than optimal bipartite matching (performance over perfection)
+- Comparing at chunk level rather than section level (reuse of existing chunking pipeline over purpose-built section parser)
 
 ## Alternatives Considered
 
@@ -208,13 +210,131 @@ def calculate_risk_delta(v1_clauses: list, v2_clauses: list) -> RiskDelta:
 
 ## Future Enhancements
 
-1. **User-adjustable thresholds**: Let power users tune sensitivity
-2. **Clause type weighting**: Prioritize changes in high-risk clause types
-3. **Change explanation**: Use LLM to summarize what changed in plain language
-4. **Template comparison**: Compare against approved template, not just previous version
+1. **Section-aware comparison** (Priority — see Addendum): Compare at logical section level, not chunk level
+2. **User-adjustable thresholds**: Let power users tune sensitivity
+3. **Clause type weighting**: Prioritize changes in high-risk clause types
+4. **Change explanation**: Use LLM to summarize what changed in plain language
+5. **Template comparison**: Compare against approved template, not just previous version
 
 ## References
 
 - [difflib documentation](https://docs.python.org/3/library/difflib.html)
 - [Cosine Similarity for Text](https://www.sciencedirect.com/topics/computer-science/cosine-similarity)
 - [Semantic Textual Similarity](https://paperswithcode.com/task/semantic-textual-similarity)
+
+---
+
+## Addendum — Findings from Real-World Testing
+
+### Problem: Chunk-Level Comparison Produces Misleading Results
+
+The ADR describes "clause matching" but the implementation actually compares **chunks** (800-character text fragments from the chunking service), not logical contract sections. This was not a deliberate design choice but rather an implicit consequence of reusing the same chunking pipeline for both embedding generation and comparison.
+
+Real-world testing with a 14-section contract (v1 vs v2 with 4 modified, 2 removed, 2 added, 6 unchanged sections) revealed significant discrepancies between expected and actual comparison results.
+
+### Test Results
+
+**Expected** (section-level):
+
+| Change Type | Count |
+|-------------|-------|
+| Added | 2 (Data Protection, Audit Rights) |
+| Removed | 2 (Non-Compete, Force Majeure) |
+| Modified | 4 (Indemnification, Limitation of Liability, Confidentiality, Payment) |
+| Unchanged | 6 (IP, Termination, Warranty, Representations, Governing Law, Assignment, Notice, Amendment) |
+| **Total** | **14** |
+
+**Actual** (chunk-level):
+
+| Change Type | Count |
+|-------------|-------|
+| Added | 6 |
+| Removed | 5 |
+| Modified | 21 |
+| Unchanged | 4 |
+| **Total** | **36** |
+
+### Root Causes Identified
+
+#### 1. Section Number Shifting Creates False Modifications
+
+Removing a section (e.g., Non-Compete was Section 4 in v1) causes all subsequent sections to renumber. "Section 6. CONFIDENTIALITY" becomes "Section 5. CONFIDENTIALITY". Since the "Section N." prefix is part of the chunk text, the embeddings differ even though the legal content is identical.
+
+**Example**: Confidentiality was unchanged but showed as "Modified, 97% similar" purely because of the section number change.
+
+#### 2. Chunk Boundary Drift
+
+The chunker splits at ~800 characters with 150-character overlap. When sections are added or removed, the entire document's chunk boundaries shift. The same text ends up split at different positions in v1 vs v2, creating chunks with different content even from identical sections.
+
+**Example**: IP Rights (identical in both versions) appeared as two "Modified" entries at 94% and 82% similarity because the chunks split at different character positions.
+
+#### 3. Cross-Section Mismatching
+
+The greedy matching algorithm can match chunks from different sections if they share enough legal terminology. When a section is removed and the next section takes its number, chunks get incorrectly paired.
+
+**Example**: v1 Non-Compete (Section 4) was matched to v2 Termination (Section 4) at 69% similarity because both share "Section 4." prefix and general contractual language. This was classified as "Modified" when it should have been "Removed" (Non-Compete) and "Unchanged" (Termination).
+
+#### 4. Mid-Sentence Chunks Lose Classification Context
+
+When a chunk starts mid-sentence (due to chunk boundary splitting), GPT-4o-mini cannot reliably identify the clause type. The tail chunk of the Non-Compete section was classified as "other" instead of "non_compete".
+
+### What Worked Correctly
+
+Despite the chunk-level issues, the core semantic comparison logic worked well:
+
+| Finding | Evidence |
+|---------|----------|
+| Indemnification cap change detected | critical → medium risk, 89% similarity, correctly identified the $5M cap addition |
+| Force Majeure removal detected | Both chunks correctly marked as "Removed" |
+| Data Protection addition detected | All chunks correctly marked as "Added" |
+| Audit Rights addition detected | Both chunks correctly marked as "Added" |
+| Payment terms change detected | Correctly identified Net-60 → Net-120 modification |
+| Confidentiality duration change detected | Caught the 5-year → 3-year change at 69% similarity |
+| Overall risk trend accurate | 0.40 → 0.41 (unchanged) — net effect of increases and decreases balanced out |
+
+### Proposed Fix: Section-Aware Comparison
+
+#### Phase 1: Section Header Detection
+
+Parse section boundaries using regex patterns common in legal contracts:
+
+```python
+import re
+
+SECTION_PATTERNS = [
+    r'^Section\s+\d+[\.\:]',
+    r'^Article\s+\d+[\.\:]',
+    r'^\d+\.\s+[A-Z]',
+    r'^[A-Z][A-Z\s]{3,}$',  # ALL-CAPS headings
+]
+
+def extract_sections(text: str) -> list[Section]:
+    """Split document into logical sections by detecting headers."""
+    # Find all section header positions
+    # Group text between consecutive headers into sections
+    # Return list of Section(title, body, start_pos, end_pos)
+```
+
+#### Phase 2: Two-Level Comparison
+
+1. **Section-level matching** (primary): Match sections by title similarity and embedding similarity. Produces the user-facing summary counts (Added: 2, Removed: 2, Modified: 4, Unchanged: 6).
+2. **Chunk-level detail** (secondary): Within each matched section pair, show chunk-level diffs for the detailed "what changed" view.
+
+#### Phase 3: Ignore Section Number Changes
+
+Strip or normalize section numbering before comparison:
+
+```python
+def normalize_section_text(text: str) -> str:
+    """Remove section numbers to prevent false diffs from renumbering."""
+    return re.sub(r'^Section\s+\d+[\.\:]\s*', 'Section. ', text)
+```
+
+### Impact Assessment
+
+| Metric | Current (Chunk-Level) | Proposed (Section-Level) |
+|--------|----------------------|--------------------------|
+| Change count accuracy | ~36 items (inflated 2.5x) | ~14 items (matches reality) |
+| False "Modified" rate | ~60% of modifications are false positives | Near zero with section matching |
+| User trust | Low — confusing inflated counts | High — matches user's mental model |
+| Implementation effort | Already built | Medium — ~2 weeks for phases 1-3 |

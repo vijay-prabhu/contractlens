@@ -345,3 +345,6 @@ ContractLens is an AI-powered contract review and risk analysis tool that helps 
 - [ADR-002: Vector Index Selection](adr/ADR-002-vector-index-selection.md)
 - [ADR-003: LLM Classification Strategy](adr/ADR-003-llm-classification-strategy.md)
 - [ADR-004: Version Comparison Strategy](adr/ADR-004-version-comparison-strategy.md)
+- [ADR-005: Real-time Update Architecture](adr/ADR-005-realtime-architecture.md)
+- [ADR-006: Configurable Clause Taxonomy](adr/ADR-006-configurable-clause-taxonomy.md)
+- [v2.0 Roadmap](roadmap-v2.md)
