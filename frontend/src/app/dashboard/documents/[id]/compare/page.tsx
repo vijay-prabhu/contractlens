@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
 import {
   ArrowLeft,
   GitCompare,
@@ -239,6 +240,12 @@ export default function ComparePage() {
   const [error, setError] = useState<string | null>(null)
   const [expandedClauses, setExpandedClauses] = useState<Set<number>>(new Set())
   const [filterType, setFilterType] = useState<string>('all')
+
+  useEffect(() => {
+    Sentry.setTag("document_id", documentId)
+    if (version1) Sentry.setTag("version1_id", version1)
+    if (version2) Sentry.setTag("version2_id", version2)
+  }, [documentId, version1, version2])
 
   useEffect(() => {
     const loadComparison = async () => {

@@ -1,5 +1,6 @@
 from typing import List
 from uuid import UUID
+import sentry_sdk
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -97,6 +98,7 @@ async def upload_document(
         )
 
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload document: {str(e)}",
@@ -563,6 +565,7 @@ async def upload_new_version(
         )
 
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload version: {str(e)}",

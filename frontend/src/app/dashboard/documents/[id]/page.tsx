@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
 import {
   ArrowLeft,
   FileText,
@@ -97,6 +98,10 @@ export default function DocumentDetailPage() {
       return next
     })
   }
+
+  useEffect(() => {
+    Sentry.setTag("document_id", id)
+  }, [id])
 
   useEffect(() => {
     const fetchData = async () => {

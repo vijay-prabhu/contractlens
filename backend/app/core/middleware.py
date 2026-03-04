@@ -4,6 +4,7 @@ import time
 import uuid
 from typing import Callable
 
+import sentry_sdk
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -27,6 +28,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         # Store request ID for use in logs
         request.state.request_id = request_id
+        sentry_sdk.set_tag("request_id", request_id)
 
         # Record start time
         start_time = time.perf_counter()

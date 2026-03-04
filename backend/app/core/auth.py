@@ -4,6 +4,7 @@ from typing import Optional
 from uuid import UUID
 
 import jwt
+import sentry_sdk
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -165,6 +166,8 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is disabled",
         )
+
+    sentry_sdk.set_user({"id": str(user.id), "email": user.email})
 
     return CurrentUser(
         id=user.id,

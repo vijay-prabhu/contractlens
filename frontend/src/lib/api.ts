@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/client'
 import type {
   Document,
@@ -30,7 +31,12 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   if (!session?.access_token) {
     cachedToken = null
     tokenExpiry = 0
+    Sentry.setUser(null)
     throw new Error('Not authenticated')
+  }
+
+  if (session.user) {
+    Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined })
   }
 
   // Cache the token
@@ -59,7 +65,11 @@ async function fetchWithAuth<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Request failed' }))
-    throw new Error(error.detail || `HTTP ${response.status}`)
+    const message = error.detail || `HTTP ${response.status}`
+    Sentry.captureException(new Error(message), {
+      tags: { endpoint, http_status: response.status },
+    })
+    throw new Error(message)
   }
 
   return response.json()
@@ -100,7 +110,11 @@ export const api = {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ detail: 'Upload failed' }))
-        throw new Error(error.detail || `HTTP ${response.status}`)
+        const message = error.detail || `HTTP ${response.status}`
+        Sentry.captureException(new Error(message), {
+          tags: { endpoint: '/api/v1/documents/upload', http_status: response.status },
+        })
+        throw new Error(message)
       }
 
       return response.json()
@@ -116,7 +130,11 @@ export const api = {
 
       if (!response.ok && response.status !== 204) {
         const error = await response.json().catch(() => ({ detail: 'Delete failed' }))
-        throw new Error(error.detail || `HTTP ${response.status}`)
+        const message = error.detail || `HTTP ${response.status}`
+        Sentry.captureException(new Error(message), {
+          tags: { endpoint: `/api/v1/documents/${id}`, http_status: response.status },
+        })
+        throw new Error(message)
       }
     },
 
@@ -151,7 +169,11 @@ export const api = {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ detail: 'Upload failed' }))
-        throw new Error(error.detail || `HTTP ${response.status}`)
+        const message = error.detail || `HTTP ${response.status}`
+        Sentry.captureException(new Error(message), {
+          tags: { endpoint: `/api/v1/documents/${id}/versions`, http_status: response.status },
+        })
+        throw new Error(message)
       }
     },
   },

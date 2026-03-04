@@ -5,6 +5,7 @@ import logging
 import uuid
 from typing import Optional, List
 
+import sentry_sdk
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,105 +44,128 @@ class DocumentProcessor:
         Returns:
             True if processing succeeded, False otherwise
         """
-        async with async_session_maker() as session:
-            try:
-                # Fetch document
-                result = await session.execute(
-                    select(Document).where(Document.id == document_id)
-                )
-                document = result.scalar_one_or_none()
+        with sentry_sdk.start_transaction(op="worker.process_document", name="process_document") as transaction:
+            transaction.set_tag("document_id", str(document_id))
 
-                if not document:
-                    logger.error(f"Document {document_id} not found")
-                    return False
-
-                # Update status to processing
-                await self._update_status(
-                    session, document, DocumentStatus.PROCESSING, "Starting processing"
-                )
-
-                # Get the latest version to process
-                version_result = await session.execute(
-                    select(DocumentVersion)
-                    .where(DocumentVersion.document_id == document_id)
-                    .order_by(DocumentVersion.version_number.desc())
-                    .limit(1)
-                )
-                document_version = version_result.scalar_one_or_none()
-
-                if not document_version:
-                    logger.error(f"No document version found for {document_id}")
-                    await self._update_status(
-                        session, document, DocumentStatus.FAILED, "No document version found"
-                    )
-                    return False
-
-                # Download file from storage using version's storage path
-                supabase = get_supabase_client()
-                file_content = await self._download_file(supabase, document_version.storage_path)
-
-                if not file_content:
-                    await self._update_status(
-                        session, document, DocumentStatus.FAILED, "Failed to download file"
-                    )
-                    return False
-
-                # Extract text
-                await self._update_status(
-                    session, document, DocumentStatus.EXTRACTING, f"Extracting text (v{document_version.version_number})"
-                )
-
+            async with async_session_maker() as session:
                 try:
-                    extraction_result = self.extraction_service.extract(
-                        file_content, document.file_type
-                    )
+                    # Fetch document and version
+                    with sentry_sdk.start_span(op="db.fetch", description="Fetch document and version"):
+                        result = await session.execute(
+                            select(Document).where(Document.id == document_id)
+                        )
+                        document = result.scalar_one_or_none()
+
+                        if not document:
+                            logger.error(f"Document {document_id} not found")
+                            transaction.set_status("not_found")
+                            return False
+
+                        # Update status to processing
+                        await self._update_status(
+                            session, document, DocumentStatus.PROCESSING, "Starting processing"
+                        )
+
+                        # Get the latest version to process
+                        version_result = await session.execute(
+                            select(DocumentVersion)
+                            .where(DocumentVersion.document_id == document_id)
+                            .order_by(DocumentVersion.version_number.desc())
+                            .limit(1)
+                        )
+                        document_version = version_result.scalar_one_or_none()
+
+                        if not document_version:
+                            logger.error(f"No document version found for {document_id}")
+                            await self._update_status(
+                                session, document, DocumentStatus.FAILED, "No document version found"
+                            )
+                            transaction.set_status("not_found")
+                            return False
+
+                    # Download file from storage using version's storage path
+                    with sentry_sdk.start_span(op="storage.download", description="Download file from Supabase"):
+                        supabase = get_supabase_client()
+                        file_content = await self._download_file(supabase, document_version.storage_path)
+
+                        if not file_content:
+                            await self._update_status(
+                                session, document, DocumentStatus.FAILED, "Failed to download file"
+                            )
+                            transaction.set_status("internal_error")
+                            return False
+
+                    # Extract text
+                    with sentry_sdk.start_span(op="extraction", description="Extract text from document"):
+                        await self._update_status(
+                            session, document, DocumentStatus.EXTRACTING, f"Extracting text (v{document_version.version_number})"
+                        )
+
+                        try:
+                            extraction_result = self.extraction_service.extract(
+                                file_content, document.file_type
+                            )
+                        except Exception as e:
+                            logger.error(f"Extraction failed for {document_id}: {e}")
+                            sentry_sdk.capture_exception(e)
+                            await self._update_status(
+                                session, document, DocumentStatus.FAILED, f"Extraction failed: {str(e)}"
+                            )
+                            transaction.set_status("internal_error")
+                            return False
+
+                    # Chunk text for embeddings
+                    with sentry_sdk.start_span(op="chunking", description="Chunk text for embeddings"):
+                        chunks = self.chunking_service.chunk_for_contracts(
+                            extraction_result.text,
+                            document_metadata={
+                                "document_id": str(document_id),
+                                "filename": document.original_filename,
+                            },
+                        )
+
+                    # Generate embeddings and classify clauses
+                    with sentry_sdk.start_span(op="ai.embed_and_classify", description="Embeddings + classification"):
+                        # Update status to analyzing
+                        await self._update_status(
+                            session, document, DocumentStatus.ANALYZING, "Generating embeddings and classifying clauses"
+                        )
+
+                        # Update document version with extracted text
+                        document_version.extracted_text = extraction_result.text
+                        document_version.page_count = extraction_result.page_count
+                        document_version.word_count = len(extraction_result.text.split())
+
+                        # Generate embeddings and create clauses
+                        clauses_created = await self._create_clauses_with_embeddings(
+                            session, document_version.id, chunks
+                        )
+
+                    # Save results
+                    with sentry_sdk.start_span(op="db.save", description="Commit results to database"):
+                        # Store extracted text and metadata on document
+                        document.extracted_text = extraction_result.text
+                        document.page_count = extraction_result.page_count
+                        document.chunk_count = len(chunks)
+                        document.word_count = len(extraction_result.text.split())
+                        document.status = DocumentStatus.COMPLETED.value
+                        document.status_message = f"Processed {extraction_result.page_count} pages, {clauses_created} clauses with embeddings"
+
+                        await session.commit()
+
+                    logger.info(f"Document {document_id} processed successfully with {clauses_created} clauses")
+                    transaction.set_status("ok")
+                    return True
+
                 except Exception as e:
-                    logger.error(f"Extraction failed for {document_id}: {e}")
-                    await self._update_status(
-                        session, document, DocumentStatus.FAILED, f"Extraction failed: {str(e)}"
-                    )
-                    return False
-
-                # Chunk text for embeddings
-                chunks = self.chunking_service.chunk_for_contracts(
-                    extraction_result.text,
-                    document_metadata={
+                    logger.exception(f"Error processing document {document_id}: {e}")
+                    sentry_sdk.set_context("document", {
                         "document_id": str(document_id),
-                        "filename": document.original_filename,
-                    },
-                )
-
-                # Update status to analyzing
-                await self._update_status(
-                    session, document, DocumentStatus.ANALYZING, "Generating embeddings and classifying clauses"
-                )
-
-                # Update document version with extracted text
-                document_version.extracted_text = extraction_result.text
-                document_version.page_count = extraction_result.page_count
-                document_version.word_count = len(extraction_result.text.split())
-
-                # Generate embeddings and create clauses
-                clauses_created = await self._create_clauses_with_embeddings(
-                    session, document_version.id, chunks
-                )
-
-                # Store extracted text and metadata on document
-                document.extracted_text = extraction_result.text
-                document.page_count = extraction_result.page_count
-                document.chunk_count = len(chunks)
-                document.word_count = len(extraction_result.text.split())
-                document.status = DocumentStatus.COMPLETED.value
-                document.status_message = f"Processed {extraction_result.page_count} pages, {clauses_created} clauses with embeddings"
-
-                await session.commit()
-                logger.info(f"Document {document_id} processed successfully with {clauses_created} clauses")
-                return True
-
-            except Exception as e:
-                logger.exception(f"Error processing document {document_id}: {e}")
-                await session.rollback()
-                return False
+                    })
+                    sentry_sdk.capture_exception(e)
+                    transaction.set_status("internal_error")
+                    await session.rollback()
+                    return False
 
     async def _update_status(
         self,
@@ -163,6 +187,8 @@ class DocumentProcessor:
             return response
         except Exception as e:
             logger.error(f"Failed to download {filename}: {e}")
+            sentry_sdk.set_context("storage", {"filename": filename})
+            sentry_sdk.capture_exception(e)
             return None
 
     async def _create_clauses_with_embeddings(
@@ -193,6 +219,8 @@ class DocumentProcessor:
             logger.info(f"Generated embeddings for {len(embeddings)} chunks")
         except Exception as e:
             logger.error(f"Failed to generate embeddings: {e}")
+            sentry_sdk.set_context("embeddings", {"chunk_count": len(chunks)})
+            sentry_sdk.capture_exception(e)
             embeddings = [None] * len(chunks)
 
         # Classify clauses using GPT-4o-mini
@@ -201,6 +229,8 @@ class DocumentProcessor:
             logger.info(f"Classified {len(classifications)} clauses")
         except Exception as e:
             logger.error(f"Failed to classify clauses: {e}")
+            sentry_sdk.set_context("classification", {"chunk_count": len(chunks)})
+            sentry_sdk.capture_exception(e)
             # Create default classifications on error
             from app.services.classification_service import ClassificationResult
             from app.models.clause import ClauseType, RiskLevel
@@ -289,6 +319,7 @@ class DocumentProcessor:
 
             except Exception as e:
                 logger.exception(f"Worker error: {e}")
+                sentry_sdk.capture_exception(e)
 
             await asyncio.sleep(poll_interval)
 

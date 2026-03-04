@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
 import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn, formatFileSize } from '@/lib/utils'
@@ -80,6 +81,11 @@ export default function UploadPage() {
         router.push(`/dashboard/documents/${document.id}`)
       }, 1000)
     } catch (err) {
+      Sentry.captureException(err, {
+        contexts: {
+          file: { name: file.name, size: file.size, type: file.type },
+        },
+      })
       setError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setUploading(false)
