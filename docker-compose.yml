@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8200:8000"
     env_file:
       - .env
     volumes:
@@ -19,14 +17,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: base
     ports:
-      - "3000:3000"
+      - "3200:3000"
     env_file:
       - .env
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    command: pnpm dev
+    command: npm run dev
 
   redis:
     image: redis:7-alpine
