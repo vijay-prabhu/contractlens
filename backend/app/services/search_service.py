@@ -98,7 +98,12 @@ class SearchService:
             FROM clauses c
             JOIN document_versions dv ON c.document_version_id = dv.id
             JOIN documents d ON dv.document_id = d.id
-            WHERE {where_sql}
+            WHERE dv.version_number = (
+                SELECT MAX(dv2.version_number)
+                FROM document_versions dv2
+                WHERE dv2.document_id = d.id
+            )
+            AND {where_sql}
             ORDER BY c.embedding <=> cast(:embedding as vector)
             LIMIT :limit
         """)
@@ -193,7 +198,12 @@ class SearchService:
             FROM clauses c
             JOIN document_versions dv ON c.document_version_id = dv.id
             JOIN documents d ON dv.document_id = d.id
-            WHERE {where_sql}
+            WHERE dv.version_number = (
+                SELECT MAX(dv2.version_number)
+                FROM document_versions dv2
+                WHERE dv2.document_id = d.id
+            )
+            AND {where_sql}
             ORDER BY c.embedding <=> cast(:embedding as vector)
             LIMIT :limit
         """)
