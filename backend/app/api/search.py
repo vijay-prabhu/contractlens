@@ -45,7 +45,7 @@ class SimilarClausesResponse(BaseModel):
 async def search_clauses(
     q: str = Query(..., min_length=3, description="Search query"),
     limit: int = Query(10, ge=1, le=50, description="Maximum results"),
-    min_similarity: float = Query(0.3, ge=0.0, le=1.0, description="Minimum similarity score (0.3 recommended for semantic search)"),
+    min_similarity: float = Query(0.5, ge=0.0, le=1.0, description="Minimum similarity score"),
     document_id: Optional[UUID] = Query(None, description="Filter by document ID"),
     current_user: CurrentUser = Depends(get_current_user),
     service: SearchService = Depends(get_search_service),
