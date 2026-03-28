@@ -80,13 +80,14 @@ class EmbeddingService:
         Returns:
             Cosine similarity score (0 to 1)
         """
-        import math
+        import numpy as np
 
-        dot_product = sum(a * b for a, b in zip(embedding1, embedding2))
-        magnitude1 = math.sqrt(sum(a * a for a in embedding1))
-        magnitude2 = math.sqrt(sum(b * b for b in embedding2))
+        a = np.asarray(embedding1)
+        b = np.asarray(embedding2)
+        norm_a = np.linalg.norm(a)
+        norm_b = np.linalg.norm(b)
 
-        if magnitude1 == 0 or magnitude2 == 0:
+        if norm_a == 0 or norm_b == 0:
             return 0.0
 
-        return dot_product / (magnitude1 * magnitude2)
+        return float(np.dot(a, b) / (norm_a * norm_b))

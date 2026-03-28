@@ -6,12 +6,11 @@ from dataclasses import dataclass, field
 from uuid import UUID
 from enum import Enum
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document_version import DocumentVersion
 from app.models.clause import Clause
-from app.services.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +101,6 @@ class ComparisonService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.embedding_service = EmbeddingService()
 
     async def compare_versions(
         self,
@@ -221,101 +219,38 @@ class ComparisonService:
         clauses1: List[Clause],
         clauses2: List[Clause],
     ) -> List[ClauseChange]:
-        """Compare clauses between two versions using semantic similarity."""
+        """Compare clauses between two versions using pgvector nearest-neighbor."""
         changes: List[ClauseChange] = []
         matched_new: set = set()
 
+        # Build a lookup for new clauses by ID
+        new_clauses_by_id = {c.id: c for c in clauses2}
+
+        # Get the version ID from new clauses (all share the same version)
+        if not clauses2:
+            # All old clauses are removed, no new clauses
+            for old_clause in clauses1:
+                changes.append(ClauseChange(
+                    change_type=ChangeType.REMOVED,
+                    clause_type=old_clause.clause_type,
+                    old_clause_id=old_clause.id,
+                    old_text=old_clause.text,
+                    old_risk_level=old_clause.risk_level,
+                    old_risk_score=old_clause.risk_score,
+                ))
+            return changes
+
+        version2_id = clauses2[0].document_version_id
+
         for old_clause in clauses1:
-            best_match: Optional[Tuple[Clause, float]] = None
-
-            # Find best matching clause in new version
-            for new_clause in clauses2:
-                if new_clause.id in matched_new:
-                    continue
-
-                similarity = self._calculate_similarity(old_clause, new_clause)
-
-                if similarity >= self.SIMILARITY_THRESHOLD:
-                    if best_match is None or similarity > best_match[1]:
-                        best_match = (new_clause, similarity)
-
-            if best_match:
-                new_clause, similarity = best_match
-                matched_new.add(new_clause.id)
-
-                if similarity >= 0.99:
-                    # Essentially unchanged
-                    changes.append(ClauseChange(
-                        change_type=ChangeType.UNCHANGED,
-                        clause_type=new_clause.clause_type,
-                        new_clause_id=new_clause.id,
-                        new_text=new_clause.text,
-                        new_risk_level=new_clause.risk_level,
-                        new_risk_score=new_clause.risk_score,
-                        old_clause_id=old_clause.id,
-                        old_text=old_clause.text,
-                        old_risk_level=old_clause.risk_level,
-                        old_risk_score=old_clause.risk_score,
-                        similarity_score=similarity,
-                    ))
-                else:
-                    # Modified
-                    text_diff = self._generate_text_diff(old_clause.text, new_clause.text)
-                    risk_change = self._calculate_risk_change(
-                        old_clause.risk_score, new_clause.risk_score
-                    )
-
-                    changes.append(ClauseChange(
-                        change_type=ChangeType.MODIFIED,
-                        clause_type=new_clause.clause_type,
-                        new_clause_id=new_clause.id,
-                        new_text=new_clause.text,
-                        new_risk_level=new_clause.risk_level,
-                        new_risk_score=new_clause.risk_score,
-                        old_clause_id=old_clause.id,
-                        old_text=old_clause.text,
-                        old_risk_level=old_clause.risk_level,
-                        old_risk_score=old_clause.risk_score,
-                        text_diff=text_diff,
-                        similarity_score=similarity,
-                        risk_change=risk_change,
-                    ))
-            else:
-                # Check if there's a somewhat similar clause (modified significantly)
-                best_partial: Optional[Tuple[Clause, float]] = None
-                for new_clause in clauses2:
-                    if new_clause.id in matched_new:
-                        continue
-                    similarity = self._calculate_similarity(old_clause, new_clause)
-                    if similarity >= self.MODIFICATION_THRESHOLD:
-                        if best_partial is None or similarity > best_partial[1]:
-                            best_partial = (new_clause, similarity)
-
-                if best_partial:
-                    new_clause, similarity = best_partial
+            # Fallback to difflib if old clause has no embedding
+            if old_clause.embedding is None:
+                best_match = self._find_best_text_match(old_clause, clauses2, matched_new)
+                if best_match:
+                    new_clause, similarity = best_match
                     matched_new.add(new_clause.id)
-                    text_diff = self._generate_text_diff(old_clause.text, new_clause.text)
-                    risk_change = self._calculate_risk_change(
-                        old_clause.risk_score, new_clause.risk_score
-                    )
-
-                    changes.append(ClauseChange(
-                        change_type=ChangeType.MODIFIED,
-                        clause_type=new_clause.clause_type,
-                        new_clause_id=new_clause.id,
-                        new_text=new_clause.text,
-                        new_risk_level=new_clause.risk_level,
-                        new_risk_score=new_clause.risk_score,
-                        old_clause_id=old_clause.id,
-                        old_text=old_clause.text,
-                        old_risk_level=old_clause.risk_level,
-                        old_risk_score=old_clause.risk_score,
-                        text_diff=text_diff,
-                        similarity_score=similarity,
-                        risk_change=risk_change,
-                    ))
+                    changes.append(self._make_change(old_clause, new_clause, similarity))
                 else:
-                    # Removed
                     changes.append(ClauseChange(
                         change_type=ChangeType.REMOVED,
                         clause_type=old_clause.clause_type,
@@ -324,6 +259,57 @@ class ComparisonService:
                         old_risk_level=old_clause.risk_level,
                         old_risk_score=old_clause.risk_score,
                     ))
+                continue
+
+            # pgvector nearest-neighbor query
+            embedding_str = "[" + ",".join(str(x) for x in old_clause.embedding) + "]"
+
+            # Build exclusion clause for already-matched IDs
+            params = {
+                "embedding": embedding_str,
+                "version_id": str(version2_id),
+            }
+
+            exclusion_sql = ""
+            if matched_new:
+                placeholders = ", ".join(f"cast(:ex_{i} as uuid)" for i in range(len(matched_new)))
+                exclusion_sql = f"AND c.id NOT IN ({placeholders})"
+                for i, mid in enumerate(matched_new):
+                    params[f"ex_{i}"] = str(mid)
+
+            sql = text(f"""
+                SELECT
+                    c.id,
+                    c.text,
+                    c.clause_type,
+                    c.risk_level,
+                    c.risk_score,
+                    1 - (c.embedding <=> cast(:embedding as vector)) as similarity
+                FROM clauses c
+                WHERE c.document_version_id = cast(:version_id as uuid)
+                  AND c.embedding IS NOT NULL
+                  {exclusion_sql}
+                ORDER BY c.embedding <=> cast(:embedding as vector)
+                LIMIT 1
+            """)
+
+            result = await self.db.execute(sql, params)
+            row = result.mappings().first()
+
+            if row and row["similarity"] >= self.MODIFICATION_THRESHOLD:
+                new_clause = new_clauses_by_id[row["id"]]
+                similarity = float(row["similarity"])
+                matched_new.add(new_clause.id)
+                changes.append(self._make_change(old_clause, new_clause, similarity))
+            else:
+                changes.append(ClauseChange(
+                    change_type=ChangeType.REMOVED,
+                    clause_type=old_clause.clause_type,
+                    old_clause_id=old_clause.id,
+                    old_text=old_clause.text,
+                    old_risk_level=old_clause.risk_level,
+                    old_risk_score=old_clause.risk_score,
+                ))
 
         # Find added clauses (in new but not matched)
         for new_clause in clauses2:
@@ -339,17 +325,57 @@ class ComparisonService:
 
         return changes
 
-    def _calculate_similarity(self, clause1: Clause, clause2: Clause) -> float:
-        """Calculate semantic similarity between two clauses."""
-        if clause1.embedding is None or clause2.embedding is None:
-            # Fallback to text similarity if no embeddings
-            return difflib.SequenceMatcher(
-                None, clause1.text, clause2.text
-            ).ratio()
+    def _make_change(
+        self, old_clause: Clause, new_clause: Clause, similarity: float
+    ) -> ClauseChange:
+        """Create a ClauseChange based on similarity threshold."""
+        if similarity >= 0.99:
+            return ClauseChange(
+                change_type=ChangeType.UNCHANGED,
+                clause_type=new_clause.clause_type,
+                new_clause_id=new_clause.id,
+                new_text=new_clause.text,
+                new_risk_level=new_clause.risk_level,
+                new_risk_score=new_clause.risk_score,
+                old_clause_id=old_clause.id,
+                old_text=old_clause.text,
+                old_risk_level=old_clause.risk_level,
+                old_risk_score=old_clause.risk_score,
+                similarity_score=similarity,
+            )
 
-        return self.embedding_service.calculate_similarity(
-            clause1.embedding, clause2.embedding
+        text_diff = self._generate_text_diff(old_clause.text, new_clause.text)
+        risk_change = self._calculate_risk_change(
+            old_clause.risk_score, new_clause.risk_score
         )
+        return ClauseChange(
+            change_type=ChangeType.MODIFIED,
+            clause_type=new_clause.clause_type,
+            new_clause_id=new_clause.id,
+            new_text=new_clause.text,
+            new_risk_level=new_clause.risk_level,
+            new_risk_score=new_clause.risk_score,
+            old_clause_id=old_clause.id,
+            old_text=old_clause.text,
+            old_risk_level=old_clause.risk_level,
+            old_risk_score=old_clause.risk_score,
+            text_diff=text_diff,
+            similarity_score=similarity,
+            risk_change=risk_change,
+        )
+
+    def _find_best_text_match(
+        self, old_clause: Clause, new_clauses: List[Clause], matched_new: set
+    ) -> Optional[Tuple[Clause, float]]:
+        """Fallback: find best match using text similarity when embeddings are missing."""
+        best: Optional[Tuple[Clause, float]] = None
+        for nc in new_clauses:
+            if nc.id in matched_new:
+                continue
+            sim = difflib.SequenceMatcher(None, old_clause.text, nc.text).ratio()
+            if sim >= self.MODIFICATION_THRESHOLD and (best is None or sim > best[1]):
+                best = (nc, sim)
+        return best
 
     def _generate_text_diff(self, text1: str, text2: str) -> str:
         """Generate inline diff between two texts."""

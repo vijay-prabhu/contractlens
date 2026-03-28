@@ -157,10 +157,11 @@ class DocumentService:
         if not document:
             return False
 
-        # Delete from storage
-        for version in document.versions:
+        # Delete from storage (batch all paths in one call)
+        storage_paths = [version.storage_path for version in document.versions]
+        if storage_paths:
             try:
-                self.supabase.storage.from_("documents").remove([version.storage_path])
+                self.supabase.storage.from_("documents").remove(storage_paths)
             except Exception:
                 pass  # Ignore storage errors
 

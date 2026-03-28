@@ -338,3 +338,47 @@ def normalize_section_text(text: str) -> str:
 | False "Modified" rate | ~60% of modifications are false positives | Near zero with section matching |
 | User trust | Low — confusing inflated counts | High — matches user's mental model |
 | Implementation effort | Already built | Medium — ~2 weeks for phases 1-3 |
+
+---
+
+## Addendum 2 — pgvector Nearest-Neighbor Optimization (2026-03-28)
+
+### Problem: O(n²) In-Memory Similarity Calculations
+
+The original `_compare_clauses` implementation used a double nested loop — for each old clause, it iterated all new clauses and computed cosine similarity in Python. This meant:
+
+- 33 clauses × 33 clauses = 1,089 similarity calculations
+- Each calculation iterated 1,536 floats in a Python loop
+- A second nested loop ran again for partial matches (MODIFICATION_THRESHOLD)
+- Total: ~2,178 similarity computations per comparison
+
+The original ADR noted this was "acceptable for contracts (<100 clauses)" and chose a "greedy matching algorithm rather than optimal bipartite matching (performance over perfection)". At MVP scale this was fine, but the database already had an HNSW index on clause embeddings that could do this work.
+
+### Fix: Delegate to pgvector HNSW Index
+
+Replaced the nested loop with per-clause pgvector nearest-neighbor queries:
+
+```sql
+SELECT c.id, 1 - (c.embedding <=> cast(:embedding as vector)) as similarity
+FROM clauses c
+WHERE c.document_version_id = :version_id
+  AND c.id NOT IN (:excluded_ids)
+ORDER BY c.embedding <=> cast(:embedding as vector)
+LIMIT 1
+```
+
+For each old clause, one HNSW probe finds the closest match in the new version's clauses. The `matched_new` exclusion set preserves greedy matching semantics. Falls back to difflib text similarity when embeddings are missing.
+
+### Complexity Change
+
+| Aspect | Before | After |
+|--------|--------|-------|
+| Algorithm | O(n × m) Python cosine similarity | O(n log m) HNSW index probes |
+| Similarity computation | Python loop over 1,536 floats | pgvector C extension |
+| Network round-trips | 0 (in-memory) | n small queries (same DB session) |
+| Double-loop for partial match | Yes (second O(n × m) pass) | No — single query finds best match at any threshold |
+
+### Additional Optimizations
+
+- **Batch storage deletion**: Supabase `.remove()` accepts a list of paths. Replaced sequential per-version deletion with a single batch call.
+- **numpy cosine similarity**: Replaced Python loop in `EmbeddingService.calculate_similarity()` with numpy for any remaining callers.

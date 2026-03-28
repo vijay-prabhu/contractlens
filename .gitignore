@@ -2,6 +2,9 @@
 .env*
 !.env.example
 
+# Claude Code
+.claude/
+
 # Internal docs (not for public)
 INTERNAL.md
 
