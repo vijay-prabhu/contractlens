@@ -1,14 +1,20 @@
 """Clause classification service using GPT-4o-mini with structured outputs."""
 import asyncio
 import logging
-from typing import List, Literal, Optional
+from enum import Enum
+from typing import List, Optional
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
 from app.core.security import sanitize_for_llm, detect_anomalies
-from app.models.clause import ClauseType, RiskLevel
+from app.core.clause_taxonomy import (
+    get_valid_type_keys,
+    get_risk_weights,
+    build_clause_types_prompt_section,
+)
+from app.models.clause import RiskLevel
 
 logger = logging.getLogger(__name__)
 
@@ -17,21 +23,20 @@ settings = get_settings()
 # Pinned model version for reproducible classifications (see ADR-009)
 CLASSIFICATION_MODEL = "gpt-4o-mini-2024-07-18"
 
-# Valid values for structured output constraints
-CLAUSE_TYPES = Literal[
-    "indemnification", "limitation_of_liability", "termination",
-    "confidentiality", "payment_terms", "intellectual_property",
-    "governing_law", "force_majeure", "warranty", "dispute_resolution",
-    "assignment", "notice", "amendment", "entire_agreement", "other",
-]
+# Risk weights loaded from config/clause_types.yaml (ADR-006)
+CLAUSE_TYPE_RISK_WEIGHTS = get_risk_weights()
 
-RISK_LEVELS = Literal["critical", "high", "medium", "low"]
+# Build structured output schema dynamically from taxonomy
+_valid_types = get_valid_type_keys()
+ClauseTypeEnum = Enum("ClauseTypeEnum", {t.upper(): t for t in _valid_types})
+
+RISK_LEVELS = Enum("RiskLevelEnum", {"LOW": "low", "MEDIUM": "medium", "HIGH": "high", "CRITICAL": "critical"})
 
 
 class ClauseClassificationSchema(BaseModel):
     """Structured output schema for clause classification."""
-    clause_type: CLAUSE_TYPES
-    risk_level: RISK_LEVELS
+    clause_type: str = Field(description=f"One of: {', '.join(_valid_types)}")
+    risk_level: str = Field(description="One of: critical, high, medium, low")
     risk_score: float = Field(ge=0.0, le=1.0)
     risk_explanation: str
     confidence: float = Field(ge=0.0, le=1.0)
@@ -50,27 +55,8 @@ class ClassificationResult:
     classification_failed: bool = False
 
 
-# Risk weights by clause type — higher weight = inherently riskier clause type
-CLAUSE_TYPE_RISK_WEIGHTS = {
-    ClauseType.INDEMNIFICATION.value: 0.8,
-    ClauseType.LIMITATION_OF_LIABILITY.value: 0.85,
-    ClauseType.TERMINATION.value: 0.6,
-    ClauseType.CONFIDENTIALITY.value: 0.5,
-    ClauseType.INTELLECTUAL_PROPERTY.value: 0.7,
-    ClauseType.WARRANTY.value: 0.65,
-    ClauseType.DISPUTE_RESOLUTION.value: 0.55,
-    ClauseType.FORCE_MAJEURE.value: 0.5,
-    ClauseType.PAYMENT_TERMS.value: 0.45,
-    ClauseType.GOVERNING_LAW.value: 0.3,
-    ClauseType.ASSIGNMENT.value: 0.4,
-    ClauseType.NOTICE.value: 0.2,
-    ClauseType.AMENDMENT.value: 0.35,
-    ClauseType.ENTIRE_AGREEMENT.value: 0.25,
-    ClauseType.OTHER.value: 0.3,
-}
-
-
-CLASSIFICATION_SYSTEM_PROMPT = """You are a legal contract analyst AI specializing in clause classification and risk assessment.
+# Build classification prompt dynamically from taxonomy (ADR-006)
+CLASSIFICATION_SYSTEM_PROMPT = f"""You are a legal contract analyst AI specializing in clause classification and risk assessment.
 
 Your task is to analyze contract clauses and provide:
 1. Clause type classification
@@ -80,21 +66,7 @@ Your task is to analyze contract clauses and provide:
 5. Actionable recommendations (for medium/high/critical risk clauses)
 
 ## Clause Types (choose one):
-- indemnification: Clauses about protecting parties from losses, damages, or liabilities
-- limitation_of_liability: Clauses limiting damages or liability exposure
-- termination: Clauses about contract termination conditions and procedures
-- confidentiality: Clauses about protecting confidential information
-- payment_terms: Clauses about payment schedules, amounts, penalties
-- intellectual_property: Clauses about IP ownership, licensing, rights
-- governing_law: Clauses specifying applicable law and jurisdiction
-- force_majeure: Clauses about unforeseeable circumstances
-- warranty: Clauses about guarantees, representations, disclaimers
-- dispute_resolution: Clauses about resolving disputes (arbitration, mediation)
-- assignment: Clauses about transferring rights or obligations
-- notice: Clauses about notification requirements
-- amendment: Clauses about modifying the agreement
-- entire_agreement: Integration clauses, superseding prior agreements
-- other: Does not fit above categories
+{build_clause_types_prompt_section()}
 
 ## Risk Levels:
 - critical: Severe financial/legal exposure, immediate attention needed
@@ -124,19 +96,19 @@ Consider these when assessing risk:
 
 ### Example 1 — Indemnification (high risk):
 Input: "Provider shall indemnify, defend, and hold harmless Client and its officers, directors, employees, and agents from and against any and all claims, damages, losses, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to Provider's breach of this Agreement or Provider's negligence or willful misconduct."
-Output: {"clause_type": "indemnification", "risk_level": "high", "risk_score": 0.75, "risk_explanation": "One-sided indemnification with broad scope covering negligence and breach, no reciprocal obligation from Client.", "confidence": 0.92, "recommendations": ["Add mutual indemnification so both parties share obligations", "Cap indemnification liability at 2x annual contract value"]}
+Output: {{"clause_type": "indemnification", "risk_level": "high", "risk_score": 0.75, "risk_explanation": "One-sided indemnification with broad scope covering negligence and breach, no reciprocal obligation from Client.", "confidence": 0.92, "recommendations": ["Add mutual indemnification so both parties share obligations", "Cap indemnification liability at 2x annual contract value"]}}
 
-### Example 2 — Limitation of Liability (medium risk):
-Input: "IN NO EVENT SHALL EITHER PARTY'S AGGREGATE LIABILITY UNDER THIS AGREEMENT EXCEED THE TOTAL FEES PAID BY CLIENT IN THE TWELVE (12) MONTH PERIOD IMMEDIATELY PRECEDING THE EVENT GIVING RISE TO THE CLAIM. NEITHER PARTY SHALL BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES."
-Output: {"clause_type": "limitation_of_liability", "risk_level": "medium", "risk_score": 0.5, "risk_explanation": "Mutual liability cap at 12 months of fees is reasonable. Consequential damages exclusion is standard but may limit recovery for significant data breaches.", "confidence": 0.95, "recommendations": ["Carve out data breach and IP infringement from consequential damages exclusion"]}
+### Example 2 — Non-Compete (high risk):
+Input: "During the term of this Agreement and for a period of twenty-four (24) months following its termination, Provider agrees that it shall not, directly or indirectly, engage in or provide services that are substantially similar to the services provided under this Agreement to any Competing Business within the Territory."
+Output: {{"clause_type": "non_compete", "risk_level": "high", "risk_score": 0.7, "risk_explanation": "Broad non-compete with 24-month duration and undefined Territory. Significantly restricts Provider's business opportunities.", "confidence": 0.93, "recommendations": ["Reduce non-compete period to 12 months", "Define Territory and Competing Business narrowly"]}}
 
-### Example 3 — Notice (low risk):
+### Example 3 — Data Protection (medium risk):
+Input: "Both parties shall comply with all applicable data protection and privacy laws including GDPR and CCPA. Provider shall implement appropriate technical and organizational measures to protect personal data against unauthorized access."
+Output: {{"clause_type": "data_protection", "risk_level": "medium", "risk_score": 0.55, "risk_explanation": "Standard data protection clause with compliance obligations. Liability for breaches limited by another section.", "confidence": 0.90, "recommendations": ["Add specific breach notification timelines", "Clarify data processing roles (controller vs processor)"]}}
+
+### Example 4 — Notice (low risk):
 Input: "All notices under this Agreement shall be in writing and shall be deemed given when delivered personally, sent by confirmed email, or sent by certified mail, return receipt requested, to the addresses set forth on the signature page."
-Output: {"clause_type": "notice", "risk_level": "low", "risk_score": 0.1, "risk_explanation": "Standard notice provision with multiple delivery methods. No unusual requirements.", "confidence": 0.97, "recommendations": []}
-
-### Example 4 — Termination (high risk):
-Input: "Client may terminate this Agreement at any time for any reason upon thirty (30) days' written notice. Provider may only terminate this Agreement in the event of Client's material breach that remains uncured for sixty (60) days after written notice."
-Output: {"clause_type": "termination", "risk_level": "high", "risk_score": 0.7, "risk_explanation": "Asymmetric termination rights — Client can terminate for convenience but Provider requires material breach with 60-day cure period. Significantly favors Client.", "confidence": 0.91, "recommendations": ["Negotiate mutual termination for convenience rights", "Reduce cure period to 30 days for both parties"]}"""
+Output: {{"clause_type": "notice", "risk_level": "low", "risk_score": 0.1, "risk_explanation": "Standard notice provision with multiple delivery methods. No unusual requirements.", "confidence": 0.97, "recommendations": []}}"""
 
 
 def _make_failed_result(error_msg: str) -> ClassificationResult:
@@ -167,14 +139,28 @@ def _make_empty_result() -> ClassificationResult:
 
 def _apply_risk_weight(parsed: ClauseClassificationSchema) -> ClassificationResult:
     """Convert structured output to ClassificationResult with risk weight blending."""
-    type_weight = CLAUSE_TYPE_RISK_WEIGHTS.get(parsed.clause_type, 0.3)
+    clause_type = parsed.clause_type
+
+    # Validate against taxonomy — log unknown types (ADR-006)
+    if clause_type not in _valid_types:
+        logger.warning(
+            f"LLM returned unknown clause type '{clause_type}', falling back to 'other'. "
+            f"Consider adding this type to config/clause_types.yaml."
+        )
+        clause_type = "other"
+
+    # Validate risk level
+    valid_levels = [rl.value for rl in RiskLevel]
+    risk_level = parsed.risk_level if parsed.risk_level in valid_levels else "low"
+
+    type_weight = CLAUSE_TYPE_RISK_WEIGHTS.get(clause_type, 0.3)
     adjusted_score = (parsed.risk_score * 0.7) + (type_weight * 0.3)
 
     recommendations = parsed.recommendations[:3] if parsed.recommendations else []
 
     return ClassificationResult(
-        clause_type=parsed.clause_type,
-        risk_level=parsed.risk_level,
+        clause_type=clause_type,
+        risk_level=risk_level,
         risk_score=round(adjusted_score, 3),
         risk_explanation=parsed.risk_explanation,
         confidence=parsed.confidence,

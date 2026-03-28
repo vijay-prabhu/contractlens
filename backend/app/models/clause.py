@@ -13,22 +13,43 @@ if TYPE_CHECKING:
 
 
 class ClauseType(str, Enum):
-    """Types of contract clauses."""
+    """Types of contract clauses — generated from config/clause_types.yaml."""
 
+    # Financial risk
     INDEMNIFICATION = "indemnification"
     LIMITATION_OF_LIABILITY = "limitation_of_liability"
-    TERMINATION = "termination"
-    CONFIDENTIALITY = "confidentiality"
     PAYMENT_TERMS = "payment_terms"
-    INTELLECTUAL_PROPERTY = "intellectual_property"
-    GOVERNING_LAW = "governing_law"
+    INSURANCE = "insurance"
+
+    # Operational risk
+    TERMINATION = "termination"
     FORCE_MAJEURE = "force_majeure"
+    SERVICE_LEVELS = "service_levels"
+    CHANGE_OF_CONTROL = "change_of_control"
+
+    # IP and data
+    INTELLECTUAL_PROPERTY = "intellectual_property"
+    CONFIDENTIALITY = "confidentiality"
+    DATA_PROTECTION = "data_protection"
+
+    # Restrictive covenants
+    NON_COMPETE = "non_compete"
+    EXCLUSIVITY = "exclusivity"
+
+    # Compliance and governance
     WARRANTY = "warranty"
     DISPUTE_RESOLUTION = "dispute_resolution"
+    AUDIT_RIGHTS = "audit_rights"
+    GOVERNING_LAW = "governing_law"
+    REPRESENTATIONS = "representations"
+
+    # Administrative
     ASSIGNMENT = "assignment"
     NOTICE = "notice"
     AMENDMENT = "amendment"
     ENTIRE_AGREEMENT = "entire_agreement"
+
+    # Catch-all
     OTHER = "other"
 
 

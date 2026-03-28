@@ -1,7 +1,27 @@
 # ADR-006: Configurable Clause Type Taxonomy
 
 ## Status
-Proposed
+Partially Implemented (Phase 1 + Phase 3)
+
+### What's implemented (2026-03-28)
+- **Phase 1**: `config/clause_types.yaml` as single source of truth
+- **Phase 1**: Dynamic prompt builder from YAML config (`clause_taxonomy.py`)
+- **Phase 1**: Risk weights loaded from YAML instead of hardcoded dict
+- **Phase 2**: Validation logging — unknown types from LLM are logged with suggestion to add to YAML
+- **Phase 3**: 8 new built-in types added (23 total, was 15):
+  - `non_compete` (0.70) — was classified as "other"
+  - `data_protection` (0.65) — was classified as "confidentiality"
+  - `audit_rights` (0.50) — was classified as "other"
+  - `representations` (0.40) — was classified as "warranty"
+  - `insurance` (0.50)
+  - `exclusivity` (0.60)
+  - `service_levels` (0.55)
+  - `change_of_control` (0.55)
+
+### What's pending
+- **Phase 4**: Custom types API (DB table, CRUD endpoints)
+- **Phase 5**: Custom types UI (settings page, type management)
+- **Phase 6**: Re-classification of existing documents with updated taxonomy
 
 ## Context
 

@@ -1,0 +1,134 @@
+# Clause Type Taxonomy — single source of truth (ADR-006)
+#
+# Adding a new type: add a block here. The classification prompt,
+# ClauseType enum, risk weights, and structured output schema are
+# all generated from this file at startup.
+#
+# Fields:
+#   description: shown to the LLM for classification
+#   risk_weight: inherent risk weight (0.0-1.0) blended with LLM score
+#   category: grouping for UI display
+
+clause_types:
+  # --- Financial risk ---
+  indemnification:
+    description: "Clauses about protecting parties from losses, damages, or liabilities"
+    risk_weight: 0.80
+    category: "financial"
+
+  limitation_of_liability:
+    description: "Clauses limiting damages or liability exposure"
+    risk_weight: 0.85
+    category: "financial"
+
+  payment_terms:
+    description: "Clauses about payment schedules, amounts, penalties, late fees"
+    risk_weight: 0.45
+    category: "financial"
+
+  insurance:
+    description: "Clauses requiring insurance coverage types, minimums, and certificates"
+    risk_weight: 0.50
+    category: "financial"
+
+  # --- Operational risk ---
+  termination:
+    description: "Clauses about contract termination conditions and procedures"
+    risk_weight: 0.60
+    category: "operational"
+
+  force_majeure:
+    description: "Clauses about unforeseeable circumstances excusing performance"
+    risk_weight: 0.50
+    category: "operational"
+
+  service_levels:
+    description: "SLA clauses about uptime guarantees, response times, performance credits"
+    risk_weight: 0.55
+    category: "operational"
+
+  change_of_control:
+    description: "Clauses about rights triggered by acquisition, merger, or ownership change"
+    risk_weight: 0.55
+    category: "operational"
+
+  # --- IP and data ---
+  intellectual_property:
+    description: "Clauses about IP ownership, licensing, work product assignment"
+    risk_weight: 0.70
+    category: "ip_and_data"
+
+  confidentiality:
+    description: "Clauses about protecting confidential information and trade secrets"
+    risk_weight: 0.50
+    category: "ip_and_data"
+
+  data_protection:
+    description: "Clauses about data privacy, GDPR/CCPA compliance, data processing obligations, breach notification"
+    risk_weight: 0.65
+    category: "ip_and_data"
+
+  # --- Restrictive covenants ---
+  non_compete:
+    description: "Clauses restricting competition, solicitation of employees or customers, or exclusivity during and after the agreement"
+    risk_weight: 0.70
+    category: "restrictive"
+
+  exclusivity:
+    description: "Clauses requiring exclusive dealing, territory restrictions, or sole-source obligations"
+    risk_weight: 0.60
+    category: "restrictive"
+
+  # --- Compliance and governance ---
+  warranty:
+    description: "Clauses about guarantees, representations, disclaimers of warranty"
+    risk_weight: 0.65
+    category: "compliance"
+
+  dispute_resolution:
+    description: "Clauses about resolving disputes through arbitration, mediation, or litigation"
+    risk_weight: 0.55
+    category: "compliance"
+
+  audit_rights:
+    description: "Clauses granting rights to inspect, audit, or review books, records, and compliance"
+    risk_weight: 0.50
+    category: "compliance"
+
+  governing_law:
+    description: "Clauses specifying applicable law and jurisdiction"
+    risk_weight: 0.30
+    category: "compliance"
+
+  representations:
+    description: "Clauses containing statements of fact relied upon by counterparties, corporate authority, and standing"
+    risk_weight: 0.40
+    category: "compliance"
+
+  # --- Administrative ---
+  assignment:
+    description: "Clauses about transferring rights or obligations to third parties"
+    risk_weight: 0.40
+    category: "administrative"
+
+  notice:
+    description: "Clauses about notification requirements, methods, and timelines"
+    risk_weight: 0.20
+    category: "administrative"
+
+  amendment:
+    description: "Clauses about modifying the agreement, waiver of provisions"
+    risk_weight: 0.35
+    category: "administrative"
+
+  entire_agreement:
+    description: "Integration clauses, superseding prior agreements"
+    risk_weight: 0.25
+    category: "administrative"
+
+  # --- Catch-all ---
+  other:
+    description: "Does not fit any defined category"
+    risk_weight: 0.30
+    category: "general"
+    is_fallback: true
