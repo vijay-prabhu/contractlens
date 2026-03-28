@@ -1,11 +1,12 @@
 """Clause classification service using GPT-4o-mini."""
+import asyncio
 import json
 import logging
 from typing import List, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 
 from app.core.config import get_settings
 from app.models.clause import ClauseType, RiskLevel
@@ -115,6 +116,7 @@ class ClassificationService:
 
     def __init__(self):
         self.client = OpenAI(api_key=settings.openai_api_key)
+        self.async_client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = CLASSIFICATION_MODEL
 
     def classify_clause(self, text: str) -> ClassificationResult:
@@ -169,18 +171,72 @@ class ClassificationService:
                 recommendations=[],
             )
 
-    def classify_clauses_batch(
-        self, texts: List[str], batch_size: int = 5
+    async def classify_clause_async(self, text: str) -> ClassificationResult:
+        """Classify a single clause asynchronously."""
+        if not text.strip():
+            return ClassificationResult(
+                clause_type=ClauseType.OTHER.value,
+                risk_level=RiskLevel.LOW.value,
+                risk_score=0.0,
+                risk_explanation="Empty or whitespace-only text",
+                confidence=0.0,
+                recommendations=[],
+            )
+
+        try:
+            response = await self.async_client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Analyze this contract clause:\n\n{text}"},
+                ],
+                temperature=0.1,
+                max_tokens=300,
+            )
+
+            result_text = response.choices[0].message.content.strip()
+            result = self._parse_classification_response(result_text)
+            return self._validate_result(result, text)
+
+        except Exception as e:
+            logger.error(f"Classification failed: {e}")
+            return ClassificationResult(
+                clause_type=ClauseType.OTHER.value,
+                risk_level=RiskLevel.LOW.value,
+                risk_score=0.0,
+                risk_explanation=f"Classification error: {str(e)}",
+                confidence=0.0,
+                recommendations=[],
+            )
+
+    async def classify_clauses_batch_async(
+        self, texts: List[str], concurrency: int = 10
     ) -> List[ClassificationResult]:
-        """Classify multiple clauses.
+        """Classify multiple clauses concurrently.
 
         Args:
             texts: List of clause texts to classify
-            batch_size: Number of clauses to classify in parallel (not implemented yet)
+            concurrency: Max parallel API calls (default 10)
 
         Returns:
             List of ClassificationResults in same order as input
         """
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def classify_with_limit(text: str) -> ClassificationResult:
+            async with semaphore:
+                return await self.classify_clause_async(text)
+
+        results = await asyncio.gather(
+            *[classify_with_limit(text) for text in texts]
+        )
+        logger.info(f"Classified {len(results)}/{len(texts)} clauses (concurrency={concurrency})")
+        return list(results)
+
+    def classify_clauses_batch(
+        self, texts: List[str], batch_size: int = 5
+    ) -> List[ClassificationResult]:
+        """Classify multiple clauses (sync wrapper, kept for backwards compat)."""
         results = []
         for i, text in enumerate(texts):
             try:

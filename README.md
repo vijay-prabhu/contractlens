@@ -225,6 +225,8 @@ Key technical decisions are documented as ADRs:
 - [ADR-003: LLM Classification Strategy](docs/adr/ADR-003-llm-classification-strategy.md)
 - [ADR-004: Version Comparison Strategy](docs/adr/ADR-004-version-comparison-strategy.md)
 - [ADR-005: Real-time Architecture](docs/adr/ADR-005-realtime-architecture.md)
+- [ADR-006: Configurable Clause Taxonomy](docs/adr/ADR-006-configurable-clause-taxonomy.md)
+- [ADR-007: Classification Pipeline Optimization](docs/adr/ADR-007-classification-pipeline-optimization.md)
 
 ## License
 

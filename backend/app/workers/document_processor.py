@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from typing import Optional, List
 
@@ -49,8 +50,12 @@ class DocumentProcessor:
 
             async with async_session_maker() as session:
                 try:
+                    pipeline_start = time.monotonic()
+                    timings = {}
+
                     # Fetch document and version
                     with sentry_sdk.start_span(op="db.fetch", description="Fetch document and version"):
+                        t0 = time.monotonic()
                         result = await session.execute(
                             select(Document).where(Document.id == document_id)
                         )
@@ -82,11 +87,14 @@ class DocumentProcessor:
                             )
                             transaction.set_status("not_found")
                             return False
+                        timings["db_fetch"] = time.monotonic() - t0
 
                     # Download file from storage using version's storage path
                     with sentry_sdk.start_span(op="storage.download", description="Download file from Supabase"):
+                        t0 = time.monotonic()
                         supabase = get_supabase_client()
                         file_content = await self._download_file(supabase, document_version.storage_path)
+                        timings["storage_download"] = time.monotonic() - t0
 
                         if not file_content:
                             await self._update_status(
@@ -102,9 +110,11 @@ class DocumentProcessor:
                         )
 
                         try:
+                            t0 = time.monotonic()
                             extraction_result = self.extraction_service.extract(
                                 file_content, document.file_type
                             )
+                            timings["text_extraction"] = time.monotonic() - t0
                         except Exception as e:
                             logger.error(f"Extraction failed for {document_id}: {e}")
                             sentry_sdk.capture_exception(e)
@@ -116,6 +126,7 @@ class DocumentProcessor:
 
                     # Chunk text for embeddings
                     with sentry_sdk.start_span(op="chunking", description="Chunk text for embeddings"):
+                        t0 = time.monotonic()
                         chunks = self.chunking_service.chunk_for_contracts(
                             extraction_result.text,
                             document_metadata={
@@ -123,6 +134,7 @@ class DocumentProcessor:
                                 "filename": document.original_filename,
                             },
                         )
+                        timings["chunking"] = time.monotonic() - t0
 
                     # Generate embeddings and classify clauses
                     with sentry_sdk.start_span(op="ai.embed_and_classify", description="Embeddings + classification"):
@@ -137,12 +149,15 @@ class DocumentProcessor:
                         document_version.word_count = len(extraction_result.text.split())
 
                         # Generate embeddings and create clauses
+                        t0 = time.monotonic()
                         clauses_created = await self._create_clauses_with_embeddings(
                             session, document_version.id, chunks
                         )
+                        timings["ai_embed_and_classify"] = time.monotonic() - t0
 
                     # Save results
                     with sentry_sdk.start_span(op="db.save", description="Commit results to database"):
+                        t0 = time.monotonic()
                         # Store extracted text and metadata on document
                         document.extracted_text = extraction_result.text
                         document.page_count = extraction_result.page_count
@@ -152,8 +167,20 @@ class DocumentProcessor:
                         document.status_message = f"Processed {extraction_result.page_count} pages, {clauses_created} clauses with embeddings"
 
                         await session.commit()
+                        timings["db_save"] = time.monotonic() - t0
 
-                    logger.info(f"Document {document_id} processed successfully with {clauses_created} clauses")
+                    total = time.monotonic() - pipeline_start
+                    timings["total"] = total
+                    logger.info(
+                        f"[PERF] Document {document_id} — {clauses_created} clauses, {len(chunks)} chunks\n"
+                        f"  db_fetch:            {timings['db_fetch']:.2f}s\n"
+                        f"  storage_download:    {timings['storage_download']:.2f}s\n"
+                        f"  text_extraction:     {timings['text_extraction']:.2f}s\n"
+                        f"  chunking:            {timings['chunking']:.2f}s\n"
+                        f"  ai_embed+classify:   {timings['ai_embed_and_classify']:.2f}s\n"
+                        f"  db_save:             {timings['db_save']:.2f}s\n"
+                        f"  TOTAL:               {total:.2f}s"
+                    )
                     transaction.set_status("ok")
                     return True
 
@@ -215,18 +242,20 @@ class DocumentProcessor:
 
         # Generate embeddings in batch
         try:
+            t0 = time.monotonic()
             embeddings = self.embedding_service.generate_embeddings(chunk_texts)
-            logger.info(f"Generated embeddings for {len(embeddings)} chunks")
+            logger.info(f"[PERF] Embeddings: {time.monotonic() - t0:.2f}s for {len(embeddings)} chunks")
         except Exception as e:
             logger.error(f"Failed to generate embeddings: {e}")
             sentry_sdk.set_context("embeddings", {"chunk_count": len(chunks)})
             sentry_sdk.capture_exception(e)
             embeddings = [None] * len(chunks)
 
-        # Classify clauses using GPT-4o-mini
+        # Classify clauses using GPT-4o-mini (parallel)
         try:
-            classifications = self.classification_service.classify_clauses_batch(chunk_texts)
-            logger.info(f"Classified {len(classifications)} clauses")
+            t0 = time.monotonic()
+            classifications = await self.classification_service.classify_clauses_batch_async(chunk_texts)
+            logger.info(f"[PERF] Classification: {time.monotonic() - t0:.2f}s for {len(classifications)} clauses (parallel API calls)")
         except Exception as e:
             logger.error(f"Failed to classify clauses: {e}")
             sentry_sdk.set_context("classification", {"chunk_count": len(chunks)})
