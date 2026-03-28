@@ -1,7 +1,7 @@
 # ADR-015: CI/CD Evaluation Gate
 
 ## Status
-Proposed
+Accepted (implemented)
 
 ## Date
 2026-03-28

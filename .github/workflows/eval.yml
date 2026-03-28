@@ -1,0 +1,101 @@
+name: Classification Eval
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/services/classification_service.py'
+      - 'backend/app/services/extraction_service.py'
+      - 'backend/app/services/docling_extraction_service.py'
+      - 'backend/app/services/chunking_service.py'
+      - 'backend/app/services/section_chunking_service.py'
+      - 'backend/app/services/embedding_service.py'
+      - 'backend/app/services/risk_scoring.py'
+      - 'backend/app/workers/document_processor.py'
+      - 'backend/app/core/security.py'
+      - 'tests/evaluation/**'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        working-directory: backend
+        run: poetry install --no-interaction
+
+      - name: Run classification evaluation
+        working-directory: backend
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SUPABASE_URL: "https://placeholder.supabase.co"
+          SUPABASE_ANON_KEY: "placeholder"
+          SUPABASE_SERVICE_ROLE_KEY: "placeholder"
+          SUPABASE_JWT_SECRET: "placeholder"
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+        run: poetry run python ../tests/evaluation/evaluate.py --save
+
+      - name: Check quality gates
+        run: python tests/evaluation/check_gates.py
+
+      - name: Comment on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Find latest results file
+            const resultsDir = 'tests/evaluation/results';
+            if (!fs.existsSync(resultsDir)) {
+              return;
+            }
+            const files = fs.readdirSync(resultsDir)
+              .filter(f => f.startsWith('eval_'))
+              .sort()
+              .reverse();
+
+            if (files.length === 0) return;
+
+            const results = JSON.parse(
+              fs.readFileSync(path.join(resultsDir, files[0]), 'utf8')
+            );
+
+            const typeAcc = (results.type_accuracy * 100).toFixed(1);
+            const levelAcc = (results.level_accuracy * 100).toFixed(1);
+            const scoreAcc = (results.score_in_range_rate * 100).toFixed(1);
+            const failRate = (results.failure_rate * 100).toFixed(1);
+            const elapsed = results.elapsed_seconds.toFixed(1);
+
+            const typeStatus = results.type_accuracy >= 0.90 ? 'PASS' : 'FAIL';
+            const levelStatus = results.level_accuracy >= 0.75 ? 'PASS' : 'FAIL';
+            const failStatus = results.failure_rate <= 0.05 ? 'PASS' : 'FAIL';
+
+            const body = `## Classification Evaluation Results
+
+            | Metric | Value | Threshold | Status |
+            |---|---|---|---|
+            | Type accuracy | ${typeAcc}% | >=90% | ${typeStatus} |
+            | Level accuracy | ${levelAcc}% | >=75% | ${levelStatus} |
+            | Score in range | ${scoreAcc}% | — | — |
+            | Failure rate | ${failRate}% | <5% | ${failStatus} |
+
+            Test set: ${results.total} clauses | Time: ${elapsed}s
+            `.replace(/            /g, '');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body,
+            });
