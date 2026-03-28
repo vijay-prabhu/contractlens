@@ -186,6 +186,12 @@ def _create_openai_clients():
     """Create OpenAI clients — with Langfuse wrapper if configured."""
     if settings.langfuse_public_key and settings.langfuse_secret_key:
         try:
+            import os
+            # Langfuse OpenAI wrapper reads these env vars directly
+            os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse_public_key
+            os.environ["LANGFUSE_SECRET_KEY"] = settings.langfuse_secret_key
+            os.environ["LANGFUSE_HOST"] = settings.langfuse_host
+
             from langfuse.openai import OpenAI as LangfuseOpenAI
             from langfuse.openai import AsyncOpenAI as LangfuseAsyncOpenAI
             logger.info("Langfuse AI observability enabled")
