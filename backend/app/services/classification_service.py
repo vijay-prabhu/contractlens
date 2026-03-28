@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
+from app.core.security import sanitize_for_llm, detect_anomalies
 from app.models.clause import ClauseType, RiskLevel
 
 logger = logging.getLogger(__name__)
@@ -218,12 +219,14 @@ class ClassificationService:
         if not text.strip():
             return _make_empty_result()
 
+        safe_text = sanitize_for_llm(text)
+
         try:
             response = self.client.beta.chat.completions.parse(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Analyze this contract clause:\n\n{text}"},
+                    {"role": "user", "content": f"Analyze this contract clause:\n\n{safe_text}"},
                 ],
                 response_format=ClauseClassificationSchema,
                 temperature=0,
@@ -233,7 +236,9 @@ class ClassificationService:
             if parsed is None:
                 return _make_failed_result("Model returned empty response")
 
-            return _apply_risk_weight(parsed)
+            result = _apply_risk_weight(parsed)
+            detect_anomalies(text, result.clause_type, result.risk_level, result.confidence)
+            return result
 
         except Exception as e:
             logger.error(f"Classification failed: {e}")
@@ -244,12 +249,14 @@ class ClassificationService:
         if not text.strip():
             return _make_empty_result()
 
+        safe_text = sanitize_for_llm(text)
+
         try:
             response = await self.async_client.beta.chat.completions.parse(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Analyze this contract clause:\n\n{text}"},
+                    {"role": "user", "content": f"Analyze this contract clause:\n\n{safe_text}"},
                 ],
                 response_format=ClauseClassificationSchema,
                 temperature=0,
@@ -259,7 +266,9 @@ class ClassificationService:
             if parsed is None:
                 return _make_failed_result("Model returned empty response")
 
-            return _apply_risk_weight(parsed)
+            result = _apply_risk_weight(parsed)
+            detect_anomalies(text, result.clause_type, result.risk_level, result.confidence)
+            return result
 
         except Exception as e:
             logger.error(f"Classification failed: {e}")

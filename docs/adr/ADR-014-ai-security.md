@@ -1,7 +1,7 @@
 # ADR-014: AI Security — OWASP LLM Top 10 Mitigations
 
 ## Status
-Proposed
+Accepted (Phase 1 implemented — input sanitization + output anomaly detection. Rate limiting prepared but needs Redis connection.)
 
 ## Date
 2026-03-28
