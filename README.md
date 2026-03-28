@@ -232,6 +232,9 @@ Key technical decisions are documented as ADRs:
 - [ADR-010: Document Parsing & Chunking](docs/adr/ADR-010-document-parsing-and-chunking.md)
 - [ADR-011: Evaluation Framework](docs/adr/ADR-011-evaluation-framework.md)
 - [ADR-012: Embedding Model Upgrade](docs/adr/ADR-012-embedding-model-upgrade.md)
+- [ADR-013: AI Observability](docs/adr/ADR-013-ai-observability.md)
+- [ADR-014: AI Security](docs/adr/ADR-014-ai-security.md)
+- [ADR-015: CI/CD Evaluation Gate](docs/adr/ADR-015-ci-cd-eval-gate.md)
 
 ## License
 
