@@ -227,6 +227,11 @@ Key technical decisions are documented as ADRs:
 - [ADR-005: Real-time Architecture](docs/adr/ADR-005-realtime-architecture.md)
 - [ADR-006: Configurable Clause Taxonomy](docs/adr/ADR-006-configurable-clause-taxonomy.md)
 - [ADR-007: Classification Pipeline Optimization](docs/adr/ADR-007-classification-pipeline-optimization.md)
+- [ADR-008: Risk Scoring Methodology](docs/adr/ADR-008-risk-scoring-methodology.md)
+- [ADR-009: Classification Quality](docs/adr/ADR-009-classification-quality.md)
+- [ADR-010: Document Parsing & Chunking](docs/adr/ADR-010-document-parsing-and-chunking.md)
+- [ADR-011: Evaluation Framework](docs/adr/ADR-011-evaluation-framework.md)
+- [ADR-012: Embedding Model Upgrade](docs/adr/ADR-012-embedding-model-upgrade.md)
 
 ## License
 
