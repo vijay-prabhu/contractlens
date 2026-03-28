@@ -46,7 +46,7 @@ graph TB
 |-------|-----------|
 | **Frontend** | Next.js 14 (App Router), TypeScript, Tailwind CSS, Lucide React |
 | **Backend** | FastAPI, Python 3.11, SQLAlchemy (async), psycopg3 |
-| **AI/ML** | OpenAI API — GPT-4o-mini (classification), text-embedding-3-small (embeddings) |
+| **AI/ML** | OpenAI API — GPT-4o-mini (classification), text-embedding-3-large (embeddings) |
 | **Database** | PostgreSQL + pgvector (Supabase) with HNSW vector index |
 | **Auth & Storage** | Supabase Auth (@supabase/ssr) + Supabase Storage |
 | **Document Parsing** | PyMuPDF (PDF), python-docx (DOCX), LangChain (chunking) |

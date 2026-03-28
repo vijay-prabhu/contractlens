@@ -10,8 +10,9 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
-# OpenAI embedding model - 1536 dimensions
-EMBEDDING_MODEL = "text-embedding-3-small"
+# OpenAI embedding model — large model with dimension reduction for backward compat
+# text-embedding-3-large scores 64.6 on MTEB vs small's 62.3 (see ADR-012)
+EMBEDDING_MODEL = "text-embedding-3-large"
 EMBEDDING_DIMENSIONS = 1536
 
 
@@ -37,6 +38,7 @@ class EmbeddingService:
         response = self.client.embeddings.create(
             model=self.model,
             input=text,
+            dimensions=EMBEDDING_DIMENSIONS,
         )
 
         return response.data[0].embedding
@@ -62,6 +64,7 @@ class EmbeddingService:
         response = self.client.embeddings.create(
             model=self.model,
             input=valid_texts,
+            dimensions=EMBEDDING_DIMENSIONS,
         )
 
         # Sort by index to maintain order

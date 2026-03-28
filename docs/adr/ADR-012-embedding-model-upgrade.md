@@ -1,7 +1,7 @@
 # ADR-012: Embedding Model Upgrade
 
 ## Status
-Proposed
+Accepted (Phase 1 implemented)
 
 ## Date
 2026-03-28
