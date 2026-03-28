@@ -111,9 +111,9 @@ function RiskTrendIndicator({ trend, oldScore, newScore }: { trend: string; oldS
         <div>
           <p className="text-sm font-medium">Risk Score</p>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold">{oldScore.toFixed(1)}</span>
+            <span className="text-lg font-bold">{oldScore.toFixed(2)}</span>
             <span className="text-gray-400">→</span>
-            <span className="text-lg font-bold">{newScore.toFixed(1)}</span>
+            <span className="text-lg font-bold">{newScore.toFixed(2)}</span>
           </div>
           <p className="text-xs capitalize">{trend}</p>
         </div>
