@@ -24,6 +24,7 @@ import {
   HelpCircle,
 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { POLLING_INTERVAL_MS } from '@/lib/constants'
 import { cn, formatDate, formatFileSize, getStatusColor } from '@/lib/utils'
 import { useToast } from '@/components/toast'
 import type { Document, DocumentAnalysis, DocumentVersion, RiskLevel } from '@/types'
@@ -166,7 +167,7 @@ export default function DocumentDetailPage() {
       }
     }
 
-    const interval = setInterval(poll, 2000) // Poll every 2s with request deduplication
+    const interval = setInterval(poll, POLLING_INTERVAL_MS)
 
     return () => {
       clearInterval(interval)

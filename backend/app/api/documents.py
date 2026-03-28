@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.auth import get_current_user, CurrentUser
+from app.api.dependencies import get_document_service
 from app.api.schemas import (
     DocumentResponse,
     DocumentListResponse,
@@ -21,7 +22,9 @@ from app.api.schemas import (
     VersionUploadResponse,
     ErrorResponse,
 )
+from app.models.clause import Clause
 from app.services.document_service import DocumentService
+from app.services.classification_service import ClassificationService
 from app.workers import processor
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -39,7 +42,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 async def upload_document(
     file: UploadFile = File(...),
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: DocumentService = Depends(get_document_service),
 ):
     """
     Upload a contract document (PDF or DOCX).
@@ -49,7 +52,6 @@ async def upload_document(
     Returns the created document with initial status.
     Requires authentication.
     """
-    service = DocumentService(db)
 
     # Validate file
     is_valid, error_message = service.validate_file(
@@ -113,7 +115,7 @@ async def list_documents(
     skip: int = 0,
     limit: int = 100,
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: DocumentService = Depends(get_document_service),
 ):
     """
     List all documents for the current user.
@@ -123,7 +125,6 @@ async def list_documents(
 
     Requires authentication.
     """
-    service = DocumentService(db)
     documents = await service.get_documents(current_user.id, skip, limit)
 
     return DocumentListResponse(
@@ -157,14 +158,13 @@ async def list_documents(
 async def get_document(
     document_id: UUID,
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: DocumentService = Depends(get_document_service),
 ):
     """
     Get a specific document by ID.
 
     Requires authentication. Users can only access their own documents.
     """
-    service = DocumentService(db)
     document = await service.get_document(document_id)
 
     if not document:
@@ -208,7 +208,7 @@ async def get_document(
 async def get_document_analysis(
     document_id: UUID,
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: DocumentService = Depends(get_document_service),
 ):
     """
     Get risk analysis for a processed document.
@@ -216,7 +216,6 @@ async def get_document_analysis(
     Returns the document, risk analysis summary, and all classified clauses.
     Requires authentication. Users can only access their own documents.
     """
-    service = DocumentService(db)
     document = await service.get_document(document_id)
 
     if not document:
@@ -241,28 +240,21 @@ async def get_document_analysis(
     # Get clauses for this document
     clauses = await service.get_document_clauses(document_id)
 
-    # Calculate risk analysis from clauses
-    risk_counts = {"low": 0, "medium": 0, "high": 0, "critical": 0}
-    total_risk_score = 0.0
-
-    for clause in clauses:
-        risk_counts[clause.risk_level] = risk_counts.get(clause.risk_level, 0) + 1
-        total_risk_score += clause.risk_score
-
-    avg_risk_score = total_risk_score / len(clauses) if clauses else 0.0
-
-    # Determine overall risk level
-    critical_count = risk_counts.get("critical", 0)
-    high_count = risk_counts.get("high", 0)
-
-    if critical_count >= 1:
-        overall_level = "critical"
-    elif high_count >= 3 or (high_count >= 1 and avg_risk_score > 0.6):
-        overall_level = "high"
-    elif avg_risk_score > 0.4:
-        overall_level = "medium"
-    else:
-        overall_level = "low"
+    # Calculate risk analysis using classification service
+    classification_service = ClassificationService()
+    from app.services.classification_service import ClassificationResult
+    classification_results = [
+        ClassificationResult(
+            clause_type=c.clause_type,
+            risk_level=c.risk_level,
+            risk_score=c.risk_score,
+            risk_explanation=c.risk_explanation or "",
+            confidence=1.0,
+            recommendations=[],
+        )
+        for c in clauses
+    ]
+    risk_summary = classification_service.calculate_document_risk_summary(classification_results)
 
     # Build response
     doc_response = DocumentResponse(
@@ -282,12 +274,12 @@ async def get_document_analysis(
     )
 
     risk_analysis = DocumentRiskAnalysis(
-        overall_risk_score=round(avg_risk_score, 3),
-        overall_risk_level=overall_level,
-        clause_count=len(clauses),
-        risk_distribution=RiskDistribution(**risk_counts),
-        high_risk_clauses=high_count,
-        critical_clauses=critical_count,
+        overall_risk_score=risk_summary["overall_risk_score"],
+        overall_risk_level=risk_summary["overall_risk_level"],
+        clause_count=risk_summary["clause_count"],
+        risk_distribution=RiskDistribution(**risk_summary["risk_distribution"]),
+        high_risk_clauses=risk_summary["high_risk_clauses"],
+        critical_clauses=risk_summary["critical_clauses"],
     )
 
     clause_responses = [
@@ -325,6 +317,7 @@ async def get_document_analysis(
 async def process_document(
     document_id: UUID,
     current_user: CurrentUser = Depends(get_current_user),
+    service: DocumentService = Depends(get_document_service),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -333,7 +326,6 @@ async def process_document(
     The document will be extracted and chunked for analysis.
     Requires authentication. Users can only process their own documents.
     """
-    service = DocumentService(db)
     document = await service.get_document(document_id)
 
     if not document:
@@ -362,8 +354,6 @@ async def process_document(
         versions = await service.get_document_versions(document_id)
         if versions:
             latest_version = versions[0]  # Already sorted by version_number desc
-            # Delete existing clauses for this version
-            from app.models.clause import Clause
             await db.execute(
                 delete(Clause).where(Clause.document_version_id == latest_version.id)
             )
@@ -393,14 +383,13 @@ async def process_document(
 async def delete_document(
     document_id: UUID,
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: DocumentService = Depends(get_document_service),
 ):
     """
     Delete a document and all its versions.
 
     Requires authentication. Users can only delete their own documents.
     """
-    service = DocumentService(db)
 
     # Check ownership first
     document = await service.get_document(document_id)
@@ -436,7 +425,7 @@ async def delete_document(
 async def list_versions(
     document_id: UUID,
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: DocumentService = Depends(get_document_service),
 ):
     """
     List all versions of a document.
@@ -444,7 +433,6 @@ async def list_versions(
     Returns versions ordered by version number (newest first).
     Requires authentication. Users can only access their own documents.
     """
-    service = DocumentService(db)
     document = await service.get_document(document_id)
 
     if not document:
@@ -493,7 +481,7 @@ async def upload_new_version(
     document_id: UUID,
     file: UploadFile = File(...),
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: DocumentService = Depends(get_document_service),
 ):
     """
     Upload a new version of an existing document.
@@ -503,7 +491,6 @@ async def upload_new_version(
     The new version will be processed automatically.
     Requires authentication. Users can only upload to their own documents.
     """
-    service = DocumentService(db)
 
     # Get existing document
     document = await service.get_document(document_id)

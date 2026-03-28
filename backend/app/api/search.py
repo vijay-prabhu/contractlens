@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
 from app.core.auth import get_current_user, CurrentUser
+from app.api.dependencies import get_search_service
 from app.services.search_service import SearchService
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -48,7 +48,7 @@ async def search_clauses(
     min_similarity: float = Query(0.3, ge=0.0, le=1.0, description="Minimum similarity score (0.3 recommended for semantic search)"),
     document_id: Optional[UUID] = Query(None, description="Filter by document ID"),
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: SearchService = Depends(get_search_service),
 ):
     """
     Search for clauses semantically similar to the query.
@@ -63,7 +63,6 @@ async def search_clauses(
 
     Requires authentication.
     """
-    service = SearchService(db)
 
     results = await service.search_clauses(
         query=q,
@@ -101,7 +100,7 @@ async def find_similar_clauses(
     min_similarity: float = Query(0.7, ge=0.0, le=1.0, description="Minimum similarity score"),
     include_same_document: bool = Query(False, description="Include clauses from same document"),
     current_user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    service: SearchService = Depends(get_search_service),
 ):
     """
     Find clauses similar to a given clause.
@@ -116,7 +115,6 @@ async def find_similar_clauses(
 
     Requires authentication.
     """
-    service = SearchService(db)
 
     results = await service.find_similar_clauses(
         clause_id=clause_id,

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Upload, FileText, RefreshCw, AlertCircle } from 'lucide-react'
 import { api } from '@/lib/api'
+import { DOCUMENT_LIST_POLLING_MS } from '@/lib/constants'
 import { DocumentCard } from '@/components/document-card'
 import { useToast } from '@/components/toast'
 import type { Document } from '@/types'
@@ -41,7 +42,7 @@ export default function DashboardPage() {
       if (hasProcessing) {
         fetchDocuments()
       }
-    }, 10000)
+    }, DOCUMENT_LIST_POLLING_MS)
 
     return () => clearInterval(interval)
   }, [fetchDocuments])

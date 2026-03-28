@@ -20,7 +20,7 @@ from app.models.clause import Clause
 from app.services.extraction_service import ExtractionService
 from app.services.chunking_service import ChunkingService, TextChunk
 from app.services.embedding_service import EmbeddingService
-from app.services.classification_service import ClassificationService
+from app.services.classification_service import ClassificationService, ClassificationResult
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +261,6 @@ class DocumentProcessor:
             sentry_sdk.set_context("classification", {"chunk_count": len(chunks)})
             sentry_sdk.capture_exception(e)
             # Create default classifications on error
-            from app.services.classification_service import ClassificationResult
             from app.models.clause import ClauseType, RiskLevel
             classifications = [
                 ClassificationResult(

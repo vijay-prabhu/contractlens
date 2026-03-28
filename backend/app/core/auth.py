@@ -52,7 +52,7 @@ def decode_jwt(token: str) -> Optional[TokenPayload]:
         TokenPayload if valid, None otherwise
     """
     settings = get_settings()
-    logger.info(f"Attempting to decode JWT token (first 50 chars): {token[:50]}...")
+    logger.debug("Attempting to decode JWT token")
 
     # First, check the algorithm in the header
     try:

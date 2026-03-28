@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, BinaryIO
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
@@ -146,7 +146,7 @@ class DocumentService:
             .values(
                 status=status,
                 status_message=message,
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(timezone.utc),
             )
         )
         await self.db.commit()

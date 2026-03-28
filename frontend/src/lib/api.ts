@@ -11,26 +11,27 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8200'
 
-// Cache for auth token to avoid repeated getSession calls
-let cachedToken: string | null = null
-let tokenExpiry: number = 0
+// Encapsulated token cache with cleanup support
+const tokenCache = {
+  token: null as string | null,
+  expiry: 0,
+  clear() {
+    this.token = null
+    this.expiry = 0
+  },
+}
 
-async function getAuthHeaders(): Promise<HeadersInit> {
-  // Use cached token if still valid (with 60 second buffer)
+async function getAuthToken(): Promise<string> {
   const now = Date.now()
-  if (cachedToken && tokenExpiry > now + 60000) {
-    return {
-      'Authorization': `Bearer ${cachedToken}`,
-      'Content-Type': 'application/json',
-    }
+  if (tokenCache.token && tokenCache.expiry > now + 60000) {
+    return tokenCache.token
   }
 
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
   if (!session?.access_token) {
-    cachedToken = null
-    tokenExpiry = 0
+    tokenCache.clear()
     Sentry.setUser(null)
     throw new Error('Not authenticated')
   }
@@ -39,14 +40,38 @@ async function getAuthHeaders(): Promise<HeadersInit> {
     Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined })
   }
 
-  // Cache the token
-  cachedToken = session.access_token
-  tokenExpiry = session.expires_at ? session.expires_at * 1000 : now + 3600000
+  tokenCache.token = session.access_token
+  tokenCache.expiry = session.expires_at ? session.expires_at * 1000 : now + 3600000
 
+  return tokenCache.token
+}
+
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const token = await getAuthToken()
   return {
-    'Authorization': `Bearer ${cachedToken}`,
+    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
   }
+}
+
+async function uploadWithAuth(url: string, formData: FormData, endpoint: string): Promise<Response> {
+  const token = await getAuthToken()
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Upload failed' }))
+    const message = error.detail || `HTTP ${response.status}`
+    Sentry.captureException(new Error(message), {
+      tags: { endpoint, http_status: response.status },
+    })
+    throw new Error(message)
+  }
+
+  return response
 }
 
 async function fetchWithAuth<T>(
@@ -75,6 +100,10 @@ async function fetchWithAuth<T>(
   return response.json()
 }
 
+export function clearTokenCache() {
+  tokenCache.clear()
+}
+
 export const api = {
   documents: {
     list: async (): Promise<DocumentListResponse> => {
@@ -90,33 +119,13 @@ export const api = {
     },
 
     upload: async (file: File): Promise<Document> => {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session?.access_token) {
-        throw new Error('Not authenticated')
-      }
-
       const formData = new FormData()
       formData.append('file', file)
-
-      const response = await fetch(`${API_URL}/api/v1/documents/upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Upload failed' }))
-        const message = error.detail || `HTTP ${response.status}`
-        Sentry.captureException(new Error(message), {
-          tags: { endpoint: '/api/v1/documents/upload', http_status: response.status },
-        })
-        throw new Error(message)
-      }
-
+      const response = await uploadWithAuth(
+        `${API_URL}/api/v1/documents/upload`,
+        formData,
+        '/api/v1/documents/upload',
+      )
       return response.json()
     },
 
@@ -149,32 +158,13 @@ export const api = {
     },
 
     uploadVersion: async (id: string, file: File): Promise<void> => {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session?.access_token) {
-        throw new Error('Not authenticated')
-      }
-
       const formData = new FormData()
       formData.append('file', file)
-
-      const response = await fetch(`${API_URL}/api/v1/documents/${id}/versions`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Upload failed' }))
-        const message = error.detail || `HTTP ${response.status}`
-        Sentry.captureException(new Error(message), {
-          tags: { endpoint: `/api/v1/documents/${id}/versions`, http_status: response.status },
-        })
-        throw new Error(message)
-      }
+      await uploadWithAuth(
+        `${API_URL}/api/v1/documents/${id}/versions`,
+        formData,
+        `/api/v1/documents/${id}/versions`,
+      )
     },
   },
 

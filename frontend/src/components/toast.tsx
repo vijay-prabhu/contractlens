@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { TOAST_DURATION_MS } from '@/lib/constants'
 
 type ToastType = 'success' | 'error' | 'warning' | 'info'
 
@@ -59,7 +60,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     // Auto-dismiss after 5 seconds
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, 5000)
+    }, TOAST_DURATION_MS)
   }, [])
 
   const dismissToast = useCallback((id: string) => {

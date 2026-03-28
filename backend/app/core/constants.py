@@ -1,0 +1,21 @@
+"""Application-wide constants. Avoid magic numbers in business logic."""
+
+# Risk thresholds for document-level assessment
+RISK_CRITICAL_THRESHOLD = 0.7
+RISK_HIGH_THRESHOLD = 0.55
+RISK_MEDIUM_THRESHOLD = 0.4
+RISK_TREND_THRESHOLD = 0.05
+
+# Comparison similarity thresholds
+SIMILARITY_SAME_THRESHOLD = 0.85
+SIMILARITY_MODIFIED_THRESHOLD = 0.6
+SIMILARITY_UNCHANGED_THRESHOLD = 0.99
+RISK_CHANGE_THRESHOLD = 0.1
+
+# Processing
+WORKER_POLL_INTERVAL_SECONDS = 15
+STUCK_DOCUMENT_TIMEOUT_MINUTES = 2
+
+# File upload
+MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+ALLOWED_FILE_EXTENSIONS = {"pdf", "docx"}

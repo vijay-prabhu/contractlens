@@ -9,6 +9,13 @@ from enum import Enum
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.constants import (
+    SIMILARITY_SAME_THRESHOLD,
+    SIMILARITY_MODIFIED_THRESHOLD,
+    SIMILARITY_UNCHANGED_THRESHOLD,
+    RISK_CHANGE_THRESHOLD,
+    RISK_TREND_THRESHOLD,
+)
 from app.models.document_version import DocumentVersion
 from app.models.clause import Clause
 
@@ -93,11 +100,8 @@ class ComparisonResult:
 class ComparisonService:
     """Service for comparing document versions."""
 
-    # Similarity threshold for considering clauses as "the same"
-    SIMILARITY_THRESHOLD = 0.85
-
-    # Similarity threshold for considering clauses as "modified" vs "different"
-    MODIFICATION_THRESHOLD = 0.6
+    SIMILARITY_THRESHOLD = SIMILARITY_SAME_THRESHOLD
+    MODIFICATION_THRESHOLD = SIMILARITY_MODIFIED_THRESHOLD
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -329,7 +333,7 @@ class ComparisonService:
         self, old_clause: Clause, new_clause: Clause, similarity: float
     ) -> ClauseChange:
         """Create a ClauseChange based on similarity threshold."""
-        if similarity >= 0.99:
+        if similarity >= SIMILARITY_UNCHANGED_THRESHOLD:
             return ClauseChange(
                 change_type=ChangeType.UNCHANGED,
                 clause_type=new_clause.clause_type,
@@ -387,9 +391,9 @@ class ComparisonService:
     ) -> str:
         """Determine if risk increased, decreased, or stayed the same."""
         diff = new_score - old_score
-        if diff > 0.1:
+        if diff > RISK_CHANGE_THRESHOLD:
             return "increased"
-        elif diff < -0.1:
+        elif diff < -RISK_CHANGE_THRESHOLD:
             return "decreased"
         return "unchanged"
 
@@ -426,9 +430,9 @@ class ComparisonService:
 
         # Determine trend
         diff = new_avg - old_avg
-        if diff > 0.05:
+        if diff > RISK_TREND_THRESHOLD:
             trend = "increased"
-        elif diff < -0.05:
+        elif diff < -RISK_TREND_THRESHOLD:
             trend = "decreased"
         else:
             trend = "unchanged"

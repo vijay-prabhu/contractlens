@@ -9,7 +9,10 @@ class Settings(BaseSettings):
     # App
     app_name: str = "ContractLens"
     environment: str = "development"
-    debug: bool = True
+    debug: bool = False
+
+    # CORS
+    cors_origins: str = "http://localhost:3200"
 
     # OpenAI
     openai_api_key: str
@@ -26,6 +29,14 @@ class Settings(BaseSettings):
 
     # Sentry (optional - for error tracking)
     sentry_dsn: Optional[str] = None
+
+    # Processing
+    worker_poll_interval: int = 15
+    max_file_size_mb: int = 10
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",")]
 
     class Config:
         env_file = ".env"

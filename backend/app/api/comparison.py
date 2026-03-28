@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.auth import get_current_user, CurrentUser
+from app.api.dependencies import get_comparison_service
 from app.api.schemas import (
     ComparisonResponse,
     ClauseChangeResponse,
@@ -32,6 +33,7 @@ async def compare_versions(
     version1: UUID,
     version2: UUID,
     current_user: CurrentUser = Depends(get_current_user),
+    service: ComparisonService = Depends(get_comparison_service),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -74,8 +76,6 @@ async def compare_versions(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied",
             )
-
-    service = ComparisonService(db)
     result = await service.compare_versions(version1, version2)
 
     if not result:
