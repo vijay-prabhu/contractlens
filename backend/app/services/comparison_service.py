@@ -73,6 +73,8 @@ class RiskSummary:
     critical_removed: int = 0
     high_risk_added: int = 0
     high_risk_removed: int = 0
+    risk_escalations: int = 0
+    risk_deescalations: int = 0
 
 
 @dataclass
@@ -403,46 +405,40 @@ class ComparisonService:
         new_clauses: List[Clause],
         changes: List[ClauseChange],
     ) -> RiskSummary:
-        """Compute overall risk change summary."""
-        old_scores = [c.risk_score for c in old_clauses]
-        new_scores = [c.risk_score for c in new_clauses]
+        """Compute overall risk change summary using ADR-008 formula."""
+        from app.services.risk_scoring import compute_document_risk, compute_comparison_risk
+        from app.services.classification_service import ClassificationResult
 
-        old_avg = sum(old_scores) / len(old_scores) if old_scores else 0.0
-        new_avg = sum(new_scores) / len(new_scores) if new_scores else 0.0
+        def clauses_to_results(clauses: List[Clause]) -> list:
+            return [
+                ClassificationResult(
+                    clause_type=c.clause_type,
+                    risk_level=c.risk_level,
+                    risk_score=c.risk_score,
+                    risk_explanation=c.risk_explanation or "",
+                    confidence=1.0,
+                    recommendations=[],
+                )
+                for c in clauses
+            ]
 
-        # Count critical/high changes
-        critical_added = sum(
-            1 for c in changes
-            if c.change_type == ChangeType.ADDED and c.new_risk_level == "critical"
-        )
-        critical_removed = sum(
-            1 for c in changes
-            if c.change_type == ChangeType.REMOVED and c.old_risk_level == "critical"
-        )
-        high_added = sum(
-            1 for c in changes
-            if c.change_type == ChangeType.ADDED and c.new_risk_level == "high"
-        )
-        high_removed = sum(
-            1 for c in changes
-            if c.change_type == ChangeType.REMOVED and c.old_risk_level == "high"
-        )
+        old_risk = compute_document_risk(clauses_to_results(old_clauses))
+        new_risk = compute_document_risk(clauses_to_results(new_clauses))
 
-        # Determine trend
-        diff = new_avg - old_avg
-        if diff > RISK_TREND_THRESHOLD:
-            trend = "increased"
-        elif diff < -RISK_TREND_THRESHOLD:
-            trend = "decreased"
-        else:
-            trend = "unchanged"
+        comparison = compute_comparison_risk(
+            old_risk.overall_risk_score,
+            new_risk.overall_risk_score,
+            changes,
+        )
 
         return RiskSummary(
-            old_overall_score=round(old_avg, 3),
-            new_overall_score=round(new_avg, 3),
-            risk_trend=trend,
-            critical_added=critical_added,
-            critical_removed=critical_removed,
-            high_risk_added=high_added,
-            high_risk_removed=high_removed,
+            old_overall_score=comparison.old_overall_score,
+            new_overall_score=comparison.new_overall_score,
+            risk_trend=comparison.risk_trend,
+            critical_added=comparison.critical_added,
+            critical_removed=comparison.critical_removed,
+            high_risk_added=comparison.high_risk_added,
+            high_risk_removed=comparison.high_risk_removed,
+            risk_escalations=comparison.risk_escalations,
+            risk_deescalations=comparison.risk_deescalations,
         )

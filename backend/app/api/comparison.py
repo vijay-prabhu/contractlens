@@ -126,6 +126,8 @@ async def compare_versions(
             critical_removed=result.risk_summary.critical_removed,
             high_risk_added=result.risk_summary.high_risk_added,
             high_risk_removed=result.risk_summary.high_risk_removed,
+            risk_escalations=result.risk_summary.risk_escalations,
+            risk_deescalations=result.risk_summary.risk_deescalations,
         ),
         clause_changes=clause_changes,
     )

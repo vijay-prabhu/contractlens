@@ -198,6 +198,8 @@ class RiskSummaryResponse(BaseModel):
     critical_removed: int = 0
     high_risk_added: int = 0
     high_risk_removed: int = 0
+    risk_escalations: int = 0
+    risk_deescalations: int = 0
 
 
 class ComparisonResponse(BaseModel):

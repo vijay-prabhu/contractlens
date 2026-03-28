@@ -1,7 +1,7 @@
 # ADR-008: Document Risk Scoring Methodology
 
 ## Status
-Proposed
+Accepted (implemented)
 
 ## Date
 2026-03-28

@@ -279,44 +279,18 @@ class ClassificationService:
     def calculate_document_risk_summary(
         self, classifications: List[ClassificationResult]
     ) -> dict:
-        """Calculate overall document risk summary from classified clauses."""
-        if not classifications:
-            return {
-                "overall_risk_score": 0.0,
-                "overall_risk_level": RiskLevel.LOW.value,
-                "clause_count": 0,
-                "risk_distribution": {},
-                "high_risk_clauses": 0,
-                "critical_clauses": 0,
-            }
+        """Calculate overall document risk summary from classified clauses.
 
-        # Count risk levels
-        risk_counts = {level.value: 0 for level in RiskLevel}
-        for c in classifications:
-            risk_counts[c.risk_level] += 1
+        Delegates to risk_scoring.compute_document_risk (ADR-008).
+        """
+        from app.services.risk_scoring import compute_document_risk
 
-        # Calculate overall risk score (weighted average)
-        total_score = sum(c.risk_score for c in classifications)
-        avg_score = total_score / len(classifications)
-
-        # Determine overall risk level based on critical/high risk clause counts
-        critical_count = risk_counts[RiskLevel.CRITICAL.value]
-        high_count = risk_counts[RiskLevel.HIGH.value]
-
-        if critical_count >= 1:
-            overall_level = RiskLevel.CRITICAL.value
-        elif high_count >= 3 or (high_count >= 1 and avg_score > 0.6):
-            overall_level = RiskLevel.HIGH.value
-        elif avg_score > 0.4:
-            overall_level = RiskLevel.MEDIUM.value
-        else:
-            overall_level = RiskLevel.LOW.value
-
+        result = compute_document_risk(classifications)
         return {
-            "overall_risk_score": round(avg_score, 3),
-            "overall_risk_level": overall_level,
-            "clause_count": len(classifications),
-            "risk_distribution": risk_counts,
-            "high_risk_clauses": high_count,
-            "critical_clauses": critical_count,
+            "overall_risk_score": result.overall_risk_score,
+            "overall_risk_level": result.overall_risk_level,
+            "clause_count": result.clause_count,
+            "risk_distribution": result.risk_distribution,
+            "high_risk_clauses": result.high_risk_clauses,
+            "critical_clauses": result.critical_clauses,
         }
