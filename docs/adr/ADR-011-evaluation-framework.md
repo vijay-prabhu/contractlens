@@ -1,7 +1,7 @@
 # ADR-011: Evaluation Framework — Measuring Classification Quality
 
 ## Status
-Proposed
+Accepted (implemented — baseline: 96.6% type accuracy, 93.1% level accuracy)
 
 ## Date
 2026-03-28
