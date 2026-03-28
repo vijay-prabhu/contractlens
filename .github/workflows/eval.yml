@@ -1,6 +1,19 @@
 name: Classification Eval
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/services/classification_service.py'
+      - 'backend/app/services/extraction_service.py'
+      - 'backend/app/services/docling_extraction_service.py'
+      - 'backend/app/services/chunking_service.py'
+      - 'backend/app/services/section_chunking_service.py'
+      - 'backend/app/services/embedding_service.py'
+      - 'backend/app/services/risk_scoring.py'
+      - 'backend/app/workers/document_processor.py'
+      - 'backend/app/core/security.py'
+      - 'tests/evaluation/**'
   pull_request:
     paths:
       - 'backend/app/services/classification_service.py'
