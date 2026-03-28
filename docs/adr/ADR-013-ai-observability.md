@@ -1,7 +1,7 @@
 # ADR-013: AI Observability — LLM Monitoring and Cost Tracking
 
 ## Status
-Proposed
+Accepted (Phase 1 implemented — classification traces)
 
 ## Date
 2026-03-28

@@ -1,9 +1,10 @@
 """Clause classification service using GPT-4o-mini with structured outputs."""
 import asyncio
 import logging
-from typing import List, Literal
+from typing import List, Literal, Optional
 from dataclasses import dataclass, field
 
+from langfuse import Langfuse
 from openai import AsyncOpenAI, OpenAI
 from pydantic import BaseModel, Field
 
@@ -183,6 +184,20 @@ def _apply_risk_weight(parsed: ClauseClassificationSchema) -> ClassificationResu
     )
 
 
+def _get_langfuse() -> Optional[Langfuse]:
+    """Get Langfuse client if configured."""
+    if settings.langfuse_public_key and settings.langfuse_secret_key:
+        try:
+            return Langfuse(
+                public_key=settings.langfuse_public_key,
+                secret_key=settings.langfuse_secret_key,
+                host=settings.langfuse_host,
+            )
+        except Exception as e:
+            logger.warning(f"Langfuse init failed: {e}")
+    return None
+
+
 class ClassificationService:
     """Service for classifying contract clauses using GPT-4o-mini."""
 
@@ -190,6 +205,40 @@ class ClassificationService:
         self.client = OpenAI(api_key=settings.openai_api_key)
         self.async_client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = CLASSIFICATION_MODEL
+        self.langfuse = _get_langfuse()
+
+    def _log_to_langfuse(
+        self, text: str, result: ClassificationResult, usage: dict, trace_id: Optional[str] = None
+    ):
+        """Log a classification call to Langfuse."""
+        if not self.langfuse:
+            return
+        try:
+            trace = self.langfuse.trace(
+                name="classify_clause",
+                id=trace_id,
+                input={"text": text[:200]},
+                output={
+                    "clause_type": result.clause_type,
+                    "risk_level": result.risk_level,
+                    "risk_score": result.risk_score,
+                    "confidence": result.confidence,
+                    "failed": result.classification_failed,
+                },
+            )
+            trace.generation(
+                name="gpt-4o-mini-classification",
+                model=self.model,
+                input=[
+                    {"role": "system", "content": "CLASSIFICATION_SYSTEM_PROMPT (truncated)"},
+                    {"role": "user", "content": f"Analyze this contract clause:\n\n{text[:200]}..."},
+                ],
+                output={"clause_type": result.clause_type, "risk_level": result.risk_level},
+                usage=usage,
+                metadata={"confidence": result.confidence, "failed": result.classification_failed},
+            )
+        except Exception as e:
+            logger.debug(f"Langfuse logging failed: {e}")
 
     def classify_clause(self, text: str) -> ClassificationResult:
         """Classify a single clause using structured outputs."""
@@ -211,7 +260,18 @@ class ClassificationService:
             if parsed is None:
                 return _make_failed_result("Model returned empty response")
 
-            return _apply_risk_weight(parsed)
+            result = _apply_risk_weight(parsed)
+
+            usage = {}
+            if response.usage:
+                usage = {
+                    "input": response.usage.prompt_tokens,
+                    "output": response.usage.completion_tokens,
+                    "total": response.usage.total_tokens,
+                }
+            self._log_to_langfuse(text, result, usage)
+
+            return result
 
         except Exception as e:
             logger.error(f"Classification failed: {e}")
@@ -237,7 +297,18 @@ class ClassificationService:
             if parsed is None:
                 return _make_failed_result("Model returned empty response")
 
-            return _apply_risk_weight(parsed)
+            result = _apply_risk_weight(parsed)
+
+            usage = {}
+            if response.usage:
+                usage = {
+                    "input": response.usage.prompt_tokens,
+                    "output": response.usage.completion_tokens,
+                    "total": response.usage.total_tokens,
+                }
+            self._log_to_langfuse(text, result, usage)
+
+            return result
 
         except Exception as e:
             logger.error(f"Classification failed: {e}")
@@ -262,6 +333,14 @@ class ClassificationService:
             logger.warning(f"Classification: {failed}/{len(results)} clauses failed")
 
         logger.info(f"Classified {len(results)}/{len(texts)} clauses (concurrency={concurrency})")
+
+        # Flush Langfuse traces after batch
+        if self.langfuse:
+            try:
+                self.langfuse.flush()
+            except Exception:
+                pass
+
         return list(results)
 
     def classify_clauses_batch(

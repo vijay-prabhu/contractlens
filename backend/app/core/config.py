@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # Sentry (optional - for error tracking)
     sentry_dsn: Optional[str] = None
 
+    # Langfuse (optional - for AI observability)
+    langfuse_public_key: Optional[str] = None
+    langfuse_secret_key: Optional[str] = None
+    langfuse_host: str = "https://us.cloud.langfuse.com"
+
     # Processing
     worker_poll_interval: int = 15
     max_file_size_mb: int = 10
