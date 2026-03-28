@@ -19,8 +19,10 @@ sys.path.insert(0, ".")
 
 from app.core.database import async_session_maker
 from app.models.document import Document, DocumentStatus
+from app.models.document_version import DocumentVersion
+from app.models.clause import Clause
 from app.workers.document_processor import DocumentProcessor
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,15 +45,28 @@ async def get_all_documents():
         return list(result.scalars().all())
 
 
-async def reset_document_status(document_id):
-    """Reset document to 'uploaded' so the processor picks it up."""
+async def reset_document_for_reprocess(document_id):
+    """Delete existing clauses and reset document status for re-processing."""
     async with async_session_maker() as session:
+        # Delete existing clauses for all versions of this document
+        versions_result = await session.execute(
+            select(DocumentVersion.id).where(DocumentVersion.document_id == document_id)
+        )
+        version_ids = [v[0] for v in versions_result.fetchall()]
+
+        for vid in version_ids:
+            await session.execute(
+                delete(Clause).where(Clause.document_version_id == vid)
+            )
+
+        # Reset document status
         await session.execute(
             update(Document)
             .where(Document.id == document_id)
             .values(status=DocumentStatus.UPLOADED.value, status_message="Queued for re-processing")
         )
         await session.commit()
+        logger.info(f"  Cleaned up clauses for {len(version_ids)} version(s)")
 
 
 async def main(dry_run: bool = False):
@@ -77,8 +92,8 @@ async def main(dry_run: bool = False):
     for i, doc in enumerate(documents):
         logger.info(f"\n[{i+1}/{len(documents)}] Processing: {doc.original_filename}")
 
-        # Reset status so processor can pick it up
-        await reset_document_status(doc.id)
+        # Delete old clauses and reset status
+        await reset_document_for_reprocess(doc.id)
 
         try:
             result = await processor.process_document(doc.id)
