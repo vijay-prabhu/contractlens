@@ -62,6 +62,7 @@ class Clause(Base, TimestampMixin):
     risk_score: Mapped[float] = mapped_column(Float, default=0.0)  # 0.0 to 1.0
     risk_explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     recommendations: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array of recommendations
+    classification_failed: Mapped[bool] = mapped_column(default=False)
 
     # Position in document
     start_position: Mapped[int] = mapped_column(Integer)

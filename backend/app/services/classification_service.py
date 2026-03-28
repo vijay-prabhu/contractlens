@@ -1,12 +1,11 @@
-"""Clause classification service using GPT-4o-mini."""
+"""Clause classification service using GPT-4o-mini with structured outputs."""
 import asyncio
-import json
 import logging
-from typing import List, Optional
-from dataclasses import dataclass
-from enum import Enum
+from typing import List, Literal
+from dataclasses import dataclass, field
 
 from openai import AsyncOpenAI, OpenAI
+from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
 from app.models.clause import ClauseType, RiskLevel
@@ -15,8 +14,28 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
-# Use GPT-4o-mini for cost-effective classification
-CLASSIFICATION_MODEL = "gpt-4o-mini"
+# Pinned model version for reproducible classifications (see ADR-009)
+CLASSIFICATION_MODEL = "gpt-4o-mini-2024-07-18"
+
+# Valid values for structured output constraints
+CLAUSE_TYPES = Literal[
+    "indemnification", "limitation_of_liability", "termination",
+    "confidentiality", "payment_terms", "intellectual_property",
+    "governing_law", "force_majeure", "warranty", "dispute_resolution",
+    "assignment", "notice", "amendment", "entire_agreement", "other",
+]
+
+RISK_LEVELS = Literal["critical", "high", "medium", "low"]
+
+
+class ClauseClassificationSchema(BaseModel):
+    """Structured output schema for clause classification."""
+    clause_type: CLAUSE_TYPES
+    risk_level: RISK_LEVELS
+    risk_score: float = Field(ge=0.0, le=1.0)
+    risk_explanation: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    recommendations: List[str] = Field(default_factory=list)
 
 
 @dataclass
@@ -24,13 +43,14 @@ class ClassificationResult:
     """Result of clause classification."""
     clause_type: str
     risk_level: str
-    risk_score: float  # 0.0 to 1.0
+    risk_score: float
     risk_explanation: str
-    confidence: float  # 0.0 to 1.0
-    recommendations: List[str]  # List of actionable recommendations
+    confidence: float
+    recommendations: List[str]
+    classification_failed: bool = False
 
 
-# Risk weights by clause type - higher weight = inherently riskier clause type
+# Risk weights by clause type — higher weight = inherently riskier clause type
 CLAUSE_TYPE_RISK_WEIGHTS = {
     ClauseType.INDEMNIFICATION.value: 0.8,
     ClauseType.LIMITATION_OF_LIABILITY.value: 0.85,
@@ -98,17 +118,69 @@ Consider these when assessing risk:
 - For low risk: provide empty array []
 - For medium/high/critical risk: provide 1-3 specific, actionable recommendations
 - Focus on what can be negotiated or changed
-- Be concise but specific (e.g., "Add a liability cap of 2x annual fees" not "Consider limiting liability")
+- Be concise but specific
 
-Respond ONLY with valid JSON in this exact format:
-{
-    "clause_type": "<type>",
-    "risk_level": "<level>",
-    "risk_score": <0.0-1.0>,
-    "risk_explanation": "<1-2 sentence explanation>",
-    "confidence": <0.0-1.0>,
-    "recommendations": ["<recommendation 1>", "<recommendation 2>"]
-}"""
+## Examples:
+
+### Example 1 — Indemnification (high risk):
+Input: "Provider shall indemnify, defend, and hold harmless Client and its officers, directors, employees, and agents from and against any and all claims, damages, losses, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to Provider's breach of this Agreement or Provider's negligence or willful misconduct."
+Output: {"clause_type": "indemnification", "risk_level": "high", "risk_score": 0.75, "risk_explanation": "One-sided indemnification with broad scope covering negligence and breach, no reciprocal obligation from Client.", "confidence": 0.92, "recommendations": ["Add mutual indemnification so both parties share obligations", "Cap indemnification liability at 2x annual contract value"]}
+
+### Example 2 — Limitation of Liability (medium risk):
+Input: "IN NO EVENT SHALL EITHER PARTY'S AGGREGATE LIABILITY UNDER THIS AGREEMENT EXCEED THE TOTAL FEES PAID BY CLIENT IN THE TWELVE (12) MONTH PERIOD IMMEDIATELY PRECEDING THE EVENT GIVING RISE TO THE CLAIM. NEITHER PARTY SHALL BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES."
+Output: {"clause_type": "limitation_of_liability", "risk_level": "medium", "risk_score": 0.5, "risk_explanation": "Mutual liability cap at 12 months of fees is reasonable. Consequential damages exclusion is standard but may limit recovery for significant data breaches.", "confidence": 0.95, "recommendations": ["Carve out data breach and IP infringement from consequential damages exclusion"]}
+
+### Example 3 — Notice (low risk):
+Input: "All notices under this Agreement shall be in writing and shall be deemed given when delivered personally, sent by confirmed email, or sent by certified mail, return receipt requested, to the addresses set forth on the signature page."
+Output: {"clause_type": "notice", "risk_level": "low", "risk_score": 0.1, "risk_explanation": "Standard notice provision with multiple delivery methods. No unusual requirements.", "confidence": 0.97, "recommendations": []}
+
+### Example 4 — Termination (high risk):
+Input: "Client may terminate this Agreement at any time for any reason upon thirty (30) days' written notice. Provider may only terminate this Agreement in the event of Client's material breach that remains uncured for sixty (60) days after written notice."
+Output: {"clause_type": "termination", "risk_level": "high", "risk_score": 0.7, "risk_explanation": "Asymmetric termination rights — Client can terminate for convenience but Provider requires material breach with 60-day cure period. Significantly favors Client.", "confidence": 0.91, "recommendations": ["Negotiate mutual termination for convenience rights", "Reduce cure period to 30 days for both parties"]}"""
+
+
+def _make_failed_result(error_msg: str) -> ClassificationResult:
+    """Create a ClassificationResult with the failure flag set."""
+    return ClassificationResult(
+        clause_type=ClauseType.OTHER.value,
+        risk_level=RiskLevel.LOW.value,
+        risk_score=0.0,
+        risk_explanation=f"Classification failed: {error_msg}",
+        confidence=0.0,
+        recommendations=[],
+        classification_failed=True,
+    )
+
+
+def _make_empty_result() -> ClassificationResult:
+    """Create a ClassificationResult for empty input."""
+    return ClassificationResult(
+        clause_type=ClauseType.OTHER.value,
+        risk_level=RiskLevel.LOW.value,
+        risk_score=0.0,
+        risk_explanation="Empty or whitespace-only text",
+        confidence=0.0,
+        recommendations=[],
+        classification_failed=False,
+    )
+
+
+def _apply_risk_weight(parsed: ClauseClassificationSchema) -> ClassificationResult:
+    """Convert structured output to ClassificationResult with risk weight blending."""
+    type_weight = CLAUSE_TYPE_RISK_WEIGHTS.get(parsed.clause_type, 0.3)
+    adjusted_score = (parsed.risk_score * 0.7) + (type_weight * 0.3)
+
+    recommendations = parsed.recommendations[:3] if parsed.recommendations else []
+
+    return ClassificationResult(
+        clause_type=parsed.clause_type,
+        risk_level=parsed.risk_level,
+        risk_score=round(adjusted_score, 3),
+        risk_explanation=parsed.risk_explanation,
+        confidence=parsed.confidence,
+        recommendations=recommendations,
+        classification_failed=False,
+    )
 
 
 class ClassificationService:
@@ -120,107 +192,61 @@ class ClassificationService:
         self.model = CLASSIFICATION_MODEL
 
     def classify_clause(self, text: str) -> ClassificationResult:
-        """Classify a single clause.
-
-        Args:
-            text: The clause text to classify
-
-        Returns:
-            ClassificationResult with type, risk level, score, and explanation
-        """
+        """Classify a single clause using structured outputs."""
         if not text.strip():
-            return ClassificationResult(
-                clause_type=ClauseType.OTHER.value,
-                risk_level=RiskLevel.LOW.value,
-                risk_score=0.0,
-                risk_explanation="Empty or whitespace-only text",
-                confidence=0.0,
-                recommendations=[],
-            )
+            return _make_empty_result()
 
         try:
-            response = self.client.chat.completions.create(
+            response = self.client.beta.chat.completions.parse(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
                     {"role": "user", "content": f"Analyze this contract clause:\n\n{text}"},
                 ],
-                temperature=0.1,  # Low temperature for consistent classification
-                max_tokens=300,
+                response_format=ClauseClassificationSchema,
+                temperature=0,
             )
 
-            result_text = response.choices[0].message.content.strip()
+            parsed = response.choices[0].message.parsed
+            if parsed is None:
+                return _make_failed_result("Model returned empty response")
 
-            # Parse JSON response
-            result = self._parse_classification_response(result_text)
-
-            # Validate and normalize values
-            result = self._validate_result(result, text)
-
-            return result
+            return _apply_risk_weight(parsed)
 
         except Exception as e:
             logger.error(f"Classification failed: {e}")
-            # Return safe defaults on error
-            return ClassificationResult(
-                clause_type=ClauseType.OTHER.value,
-                risk_level=RiskLevel.LOW.value,
-                risk_score=0.0,
-                risk_explanation=f"Classification error: {str(e)}",
-                confidence=0.0,
-                recommendations=[],
-            )
+            return _make_failed_result(str(e))
 
     async def classify_clause_async(self, text: str) -> ClassificationResult:
-        """Classify a single clause asynchronously."""
+        """Classify a single clause asynchronously using structured outputs."""
         if not text.strip():
-            return ClassificationResult(
-                clause_type=ClauseType.OTHER.value,
-                risk_level=RiskLevel.LOW.value,
-                risk_score=0.0,
-                risk_explanation="Empty or whitespace-only text",
-                confidence=0.0,
-                recommendations=[],
-            )
+            return _make_empty_result()
 
         try:
-            response = await self.async_client.chat.completions.create(
+            response = await self.async_client.beta.chat.completions.parse(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": CLASSIFICATION_SYSTEM_PROMPT},
                     {"role": "user", "content": f"Analyze this contract clause:\n\n{text}"},
                 ],
-                temperature=0.1,
-                max_tokens=300,
+                response_format=ClauseClassificationSchema,
+                temperature=0,
             )
 
-            result_text = response.choices[0].message.content.strip()
-            result = self._parse_classification_response(result_text)
-            return self._validate_result(result, text)
+            parsed = response.choices[0].message.parsed
+            if parsed is None:
+                return _make_failed_result("Model returned empty response")
+
+            return _apply_risk_weight(parsed)
 
         except Exception as e:
             logger.error(f"Classification failed: {e}")
-            return ClassificationResult(
-                clause_type=ClauseType.OTHER.value,
-                risk_level=RiskLevel.LOW.value,
-                risk_score=0.0,
-                risk_explanation=f"Classification error: {str(e)}",
-                confidence=0.0,
-                recommendations=[],
-            )
+            return _make_failed_result(str(e))
 
     async def classify_clauses_batch_async(
         self, texts: List[str], concurrency: int = 10
     ) -> List[ClassificationResult]:
-        """Classify multiple clauses concurrently.
-
-        Args:
-            texts: List of clause texts to classify
-            concurrency: Max parallel API calls (default 10)
-
-        Returns:
-            List of ClassificationResults in same order as input
-        """
+        """Classify multiple clauses concurrently."""
         semaphore = asyncio.Semaphore(concurrency)
 
         async def classify_with_limit(text: str) -> ClassificationResult:
@@ -230,6 +256,11 @@ class ClassificationService:
         results = await asyncio.gather(
             *[classify_with_limit(text) for text in texts]
         )
+
+        failed = sum(1 for r in results if r.classification_failed)
+        if failed > 0:
+            logger.warning(f"Classification: {failed}/{len(results)} clauses failed")
+
         logger.info(f"Classified {len(results)}/{len(texts)} clauses (concurrency={concurrency})")
         return list(results)
 
@@ -239,101 +270,16 @@ class ClassificationService:
         """Classify multiple clauses (sync wrapper, kept for backwards compat)."""
         results = []
         for i, text in enumerate(texts):
-            try:
-                result = self.classify_clause(text)
-                results.append(result)
-                if (i + 1) % 10 == 0:
-                    logger.info(f"Classified {i + 1}/{len(texts)} clauses")
-            except Exception as e:
-                logger.error(f"Failed to classify clause {i}: {e}")
-                results.append(ClassificationResult(
-                    clause_type=ClauseType.OTHER.value,
-                    risk_level=RiskLevel.LOW.value,
-                    risk_score=0.0,
-                    risk_explanation=f"Classification error: {str(e)}",
-                    confidence=0.0,
-                    recommendations=[],
-                ))
-
+            result = self.classify_clause(text)
+            results.append(result)
+            if (i + 1) % 10 == 0:
+                logger.info(f"Classified {i + 1}/{len(texts)} clauses")
         return results
-
-    def _parse_classification_response(self, response_text: str) -> dict:
-        """Parse the JSON response from GPT-4o-mini."""
-        # Handle markdown code blocks
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0]
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0]
-
-        return json.loads(response_text.strip())
-
-    def _validate_result(self, parsed: dict, original_text: str) -> ClassificationResult:
-        """Validate and normalize classification result."""
-        # Validate clause_type
-        valid_types = [t.value for t in ClauseType]
-        clause_type = parsed.get("clause_type", "other").lower()
-        if clause_type not in valid_types:
-            clause_type = ClauseType.OTHER.value
-
-        # Validate risk_level
-        valid_levels = [r.value for r in RiskLevel]
-        risk_level = parsed.get("risk_level", "low").lower()
-        if risk_level not in valid_levels:
-            risk_level = RiskLevel.LOW.value
-
-        # Validate risk_score (0.0 to 1.0)
-        risk_score = parsed.get("risk_score", 0.0)
-        try:
-            risk_score = float(risk_score)
-            risk_score = max(0.0, min(1.0, risk_score))
-        except (ValueError, TypeError):
-            risk_score = 0.0
-
-        # Apply clause type risk weight to score
-        type_weight = CLAUSE_TYPE_RISK_WEIGHTS.get(clause_type, 0.3)
-        # Blend LLM assessment with type-based weight
-        adjusted_score = (risk_score * 0.7) + (type_weight * 0.3)
-
-        # Validate confidence
-        confidence = parsed.get("confidence", 0.5)
-        try:
-            confidence = float(confidence)
-            confidence = max(0.0, min(1.0, confidence))
-        except (ValueError, TypeError):
-            confidence = 0.5
-
-        # Get explanation
-        risk_explanation = parsed.get("risk_explanation", "No explanation provided")
-        if not isinstance(risk_explanation, str):
-            risk_explanation = str(risk_explanation)
-
-        # Get recommendations
-        recommendations = parsed.get("recommendations", [])
-        if not isinstance(recommendations, list):
-            recommendations = []
-        # Ensure all items are strings and limit to 3
-        recommendations = [str(r) for r in recommendations if r][:3]
-
-        return ClassificationResult(
-            clause_type=clause_type,
-            risk_level=risk_level,
-            risk_score=round(adjusted_score, 3),
-            risk_explanation=risk_explanation,
-            confidence=confidence,
-            recommendations=recommendations,
-        )
 
     def calculate_document_risk_summary(
         self, classifications: List[ClassificationResult]
     ) -> dict:
-        """Calculate overall document risk summary from classified clauses.
-
-        Args:
-            classifications: List of classification results for all clauses
-
-        Returns:
-            Dictionary with risk summary statistics
-        """
+        """Calculate overall document risk summary from classified clauses."""
         if not classifications:
             return {
                 "overall_risk_score": 0.0,

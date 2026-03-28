@@ -284,6 +284,7 @@ class DocumentProcessor:
                 risk_score=classification.risk_score,
                 risk_explanation=classification.risk_explanation,
                 recommendations=json.dumps(classification.recommendations) if classification.recommendations else None,
+                classification_failed=classification.classification_failed,
                 start_position=chunk.start_char,
                 end_position=chunk.end_char,
                 embedding=embedding,

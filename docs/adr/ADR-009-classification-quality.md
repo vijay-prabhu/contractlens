@@ -1,7 +1,7 @@
 # ADR-009: Classification Quality — Structured Outputs, Few-Shot, and Guardrails
 
 ## Status
-Proposed
+Accepted (implemented)
 
 ## Date
 2026-03-28
