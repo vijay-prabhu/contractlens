@@ -7,11 +7,11 @@ AI-powered contract review and risk analysis platform. Upload legal documents (P
 ```mermaid
 graph TB
     subgraph Frontend
-        A[Next.js 14 + TypeScript<br/>Tailwind CSS<br/>Port 3000]
+        A[Next.js 14 + TypeScript<br/>Tailwind CSS<br/>Port 3200]
     end
 
     subgraph Backend
-        B[FastAPI<br/>Python 3.11<br/>Port 8000]
+        B[FastAPI<br/>Python 3.11<br/>Port 8200]
         C[Background Worker<br/>Document Processor]
     end
 
@@ -121,6 +121,9 @@ contractlens/
 ├── docs/
 │   ├── architecture.md       # Detailed architecture documentation
 │   └── adr/                  # Architecture Decision Records
+├── dev-start.sh              # Start backend + frontend locally
+├── dev-stop.sh               # Stop all local services
+├── dev-logs.sh               # Tail service logs
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -143,7 +146,7 @@ contractlens/
 
 All endpoints except `/health` require JWT authentication via `Authorization: Bearer <token>` header.
 
-API docs (Swagger UI) available at `http://localhost:8000/docs` when running locally.
+API docs (Swagger UI) available at `http://localhost:8200/docs` when running locally.
 
 ## Getting Started
 
@@ -177,26 +180,29 @@ API docs (Swagger UI) available at `http://localhost:8000/docs` when running loc
    - Run the SQL files from `backend/migrations/` in the Supabase SQL editor
    - Enable the `vector` extension in Supabase (Extensions page)
 
-4. **Run with Docker Compose**
+4. **Run locally**
+   ```bash
+   # Install dependencies (first time only)
+   cd backend && poetry install && cd ..
+   cd frontend && npm install && cd ..
+
+   # Start all services
+   ./dev-start.sh
+
+   # Stop all services
+   ./dev-stop.sh
+
+   # View logs
+   ./dev-logs.sh [backend|frontend]
+   ```
+
+   Or run with Docker Compose:
+
    ```bash
    docker compose up
    ```
 
-   Or run manually:
-
-   ```bash
-   # Terminal 1 — Backend
-   cd backend
-   poetry install
-   poetry run uvicorn app.main:app --reload --port 8000
-
-   # Terminal 2 — Frontend
-   cd frontend
-   npm install
-   npm run dev
-   ```
-
-5. Open http://localhost:3000
+5. Open http://localhost:3200
 
 ## Testing
 

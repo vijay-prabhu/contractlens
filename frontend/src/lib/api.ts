@@ -9,7 +9,7 @@ import type {
   SearchResponse,
 } from '@/types'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8200'
 
 // Cache for auth token to avoid repeated getSession calls
 let cachedToken: string | null = null
