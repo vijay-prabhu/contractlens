@@ -18,7 +18,9 @@ from app.models.document import Document, DocumentStatus
 from app.models.document_version import DocumentVersion
 from app.models.clause import Clause
 from app.services.extraction_service import ExtractionService
-from app.services.chunking_service import ChunkingService, TextChunk
+from app.services.chunking_service import ChunkingService
+from app.services.docling_extraction_service import DoclingExtractionService
+from app.services.section_chunking_service import TextChunk, chunk_sections
 from app.services.embedding_service import EmbeddingService
 from app.services.classification_service import ClassificationService, ClassificationResult
 
@@ -30,6 +32,7 @@ class DocumentProcessor:
 
     def __init__(self):
         self.extraction_service = ExtractionService()
+        self.docling_service = DoclingExtractionService()
         self.chunking_service = ChunkingService()
         self.embedding_service = EmbeddingService()
         self.classification_service = ClassificationService()
@@ -103,38 +106,66 @@ class DocumentProcessor:
                             transaction.set_status("internal_error")
                             return False
 
-                    # Extract text
+                    # Extract text and chunk — Docling with PyMuPDF fallback
                     with sentry_sdk.start_span(op="extraction", description="Extract text from document"):
                         await self._update_status(
                             session, document, DocumentStatus.EXTRACTING, f"Extracting text (v{document_version.version_number})"
                         )
 
+                        doc_metadata = {
+                            "document_id": str(document_id),
+                            "filename": document.original_filename,
+                        }
+
                         try:
                             t0 = time.monotonic()
-                            extraction_result = self.extraction_service.extract(
+                            docling_result = self.docling_service.extract(
                                 file_content, document.file_type
                             )
+                            extracted_text = docling_result.full_text
+                            page_count = docling_result.page_count
                             timings["text_extraction"] = time.monotonic() - t0
-                        except Exception as e:
-                            logger.error(f"Extraction failed for {document_id}: {e}")
-                            sentry_sdk.capture_exception(e)
-                            await self._update_status(
-                                session, document, DocumentStatus.FAILED, f"Extraction failed: {str(e)}"
-                            )
-                            transaction.set_status("internal_error")
-                            return False
+                            extraction_method = "docling"
 
-                    # Chunk text for embeddings
-                    with sentry_sdk.start_span(op="chunking", description="Chunk text for embeddings"):
-                        t0 = time.monotonic()
-                        chunks = self.chunking_service.chunk_for_contracts(
-                            extraction_result.text,
-                            document_metadata={
-                                "document_id": str(document_id),
-                                "filename": document.original_filename,
-                            },
-                        )
-                        timings["chunking"] = time.monotonic() - t0
+                            # Section-aware chunking from Docling output
+                            t0 = time.monotonic()
+                            chunks = chunk_sections(
+                                docling_result.sections,
+                                document_metadata=doc_metadata,
+                            )
+                            timings["chunking"] = time.monotonic() - t0
+                            logger.info(f"[PERF] Docling: {len(docling_result.sections)} sections → {len(chunks)} chunks")
+
+                        except Exception as e:
+                            logger.warning(f"Docling extraction failed, falling back to PyMuPDF: {e}")
+                            sentry_sdk.capture_exception(e)
+
+                            try:
+                                t0 = time.monotonic()
+                                extraction_result = self.extraction_service.extract(
+                                    file_content, document.file_type
+                                )
+                                extracted_text = extraction_result.text
+                                page_count = extraction_result.page_count
+                                timings["text_extraction"] = time.monotonic() - t0
+                                extraction_method = "pymupdf_fallback"
+
+                                t0 = time.monotonic()
+                                chunks = self.chunking_service.chunk_for_contracts(
+                                    extraction_result.text,
+                                    document_metadata=doc_metadata,
+                                )
+                                timings["chunking"] = time.monotonic() - t0
+                                logger.info(f"[PERF] PyMuPDF fallback: {len(chunks)} chunks")
+
+                            except Exception as e2:
+                                logger.error(f"Both extraction methods failed for {document_id}: {e2}")
+                                sentry_sdk.capture_exception(e2)
+                                await self._update_status(
+                                    session, document, DocumentStatus.FAILED, f"Extraction failed: {str(e2)}"
+                                )
+                                transaction.set_status("internal_error")
+                                return False
 
                     # Generate embeddings and classify clauses
                     with sentry_sdk.start_span(op="ai.embed_and_classify", description="Embeddings + classification"):
@@ -144,9 +175,9 @@ class DocumentProcessor:
                         )
 
                         # Update document version with extracted text
-                        document_version.extracted_text = extraction_result.text
-                        document_version.page_count = extraction_result.page_count
-                        document_version.word_count = len(extraction_result.text.split())
+                        document_version.extracted_text = extracted_text
+                        document_version.page_count = page_count
+                        document_version.word_count = len(extracted_text.split())
 
                         # Generate embeddings and create clauses
                         t0 = time.monotonic()
@@ -159,12 +190,12 @@ class DocumentProcessor:
                     with sentry_sdk.start_span(op="db.save", description="Commit results to database"):
                         t0 = time.monotonic()
                         # Store extracted text and metadata on document
-                        document.extracted_text = extraction_result.text
-                        document.page_count = extraction_result.page_count
+                        document.extracted_text = extracted_text
+                        document.page_count = page_count
                         document.chunk_count = len(chunks)
-                        document.word_count = len(extraction_result.text.split())
+                        document.word_count = len(extracted_text.split())
                         document.status = DocumentStatus.COMPLETED.value
-                        document.status_message = f"Processed {extraction_result.page_count} pages, {clauses_created} clauses with embeddings"
+                        document.status_message = f"Processed {page_count} pages, {clauses_created} clauses ({extraction_method})"
 
                         await session.commit()
                         timings["db_save"] = time.monotonic() - t0

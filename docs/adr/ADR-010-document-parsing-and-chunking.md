@@ -1,7 +1,7 @@
 # ADR-010: Document Parsing & Chunking — Docling Migration
 
 ## Status
-Proposed
+Accepted (Phase 1 implemented — Docling + section chunking with PyMuPDF fallback)
 
 ## Date
 2026-03-28

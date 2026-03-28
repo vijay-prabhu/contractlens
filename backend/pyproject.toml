@@ -28,6 +28,7 @@ pgvector = "^0.2.4"
 psycopg = {extras = ["binary"], version = "^3.3.2"}
 pyjwt = "^2.10.1"
 sentry-sdk = {extras = ["fastapi"], version = "^2.49.0"}
+docling = "^2.82.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
