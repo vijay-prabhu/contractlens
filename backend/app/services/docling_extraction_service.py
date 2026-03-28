@@ -75,7 +75,10 @@ class DoclingExtractionService:
         markdown = doc.export_to_markdown()
 
         # Count pages and tables
-        page_count = result.pages if hasattr(result, 'pages') else self._estimate_pages(doc)
+        if hasattr(result, 'pages') and result.pages:
+            page_count = len(result.pages) if hasattr(result.pages, '__len__') else self._estimate_pages(doc)
+        else:
+            page_count = self._estimate_pages(doc)
         tables_count = sum(1 for item, _ in doc.iterate_items() if item.label == DocItemLabel.TABLE)
 
         # Extract metadata

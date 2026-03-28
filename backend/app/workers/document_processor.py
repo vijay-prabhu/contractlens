@@ -195,7 +195,7 @@ class DocumentProcessor:
                         document.chunk_count = len(chunks)
                         document.word_count = len(extracted_text.split())
                         document.status = DocumentStatus.COMPLETED.value
-                        document.status_message = f"Processed {page_count} pages, {clauses_created} clauses ({extraction_method})"
+                        document.status_message = f"Processed {page_count} pages, {clauses_created} clauses"
 
                         await session.commit()
                         timings["db_save"] = time.monotonic() - t0
