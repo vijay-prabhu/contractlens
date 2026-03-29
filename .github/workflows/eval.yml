@@ -61,7 +61,7 @@ jobs:
         run: python tests/evaluation/check_gates.py
 
       - name: Comment on PR
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
