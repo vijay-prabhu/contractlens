@@ -1,7 +1,7 @@
-# ADR-014: AI Security — OWASP LLM Top 10 Mitigations
+# ADR-014: AI Security - OWASP LLM Top 10 Mitigations
 
 ## Status
-Accepted (Phase 1 implemented — input sanitization + output anomaly detection. Rate limiting prepared but needs Redis connection.)
+Accepted (Phase 1 implemented - input sanitization + output anomaly detection. Rate limiting prepared but needs Redis connection.)
 
 ## Date
 2026-03-28
@@ -14,12 +14,12 @@ ContractLens sends user-uploaded document text directly to OpenAI's API for clas
 
 | OWASP Risk | Severity | Current Status |
 |---|---|---|
-| **LLM01: Prompt Injection** | HIGH | Not mitigated — document text goes directly into LLM prompt |
-| **LLM02: Sensitive Information Disclosure** | HIGH | Partially mitigated — OpenAI data policy, no local model option |
-| **LLM07: System Prompt Leakage** | MEDIUM | Not mitigated — classification prompt in every API call |
-| **LLM08: Vector/Embedding Weaknesses** | MEDIUM | Not mitigated — no validation on stored embeddings |
-| **LLM09: Misinformation** | HIGH | Partially mitigated — confidence scores, eval framework |
-| **LLM10: Unbounded Consumption** | MEDIUM | Partially mitigated — concurrency limits, no per-user rate limiting |
+| **LLM01: Prompt Injection** | HIGH | Not mitigated - document text goes directly into LLM prompt |
+| **LLM02: Sensitive Information Disclosure** | HIGH | Partially mitigated - OpenAI data policy, no local model option |
+| **LLM07: System Prompt Leakage** | MEDIUM | Not mitigated - classification prompt in every API call |
+| **LLM08: Vector/Embedding Weaknesses** | MEDIUM | Not mitigated - no validation on stored embeddings |
+| **LLM09: Misinformation** | HIGH | Partially mitigated - confidence scores, eval framework |
+| **LLM10: Unbounded Consumption** | MEDIUM | Partially mitigated - concurrency limits, no per-user rate limiting |
 
 ### Prompt Injection Scenario
 
@@ -59,7 +59,7 @@ def sanitize_for_llm(text: str) -> str:
     return text
 ```
 
-This is not foolproof — prompt injection can't be fully prevented by pattern matching. But it catches the most common attack vectors.
+This is not foolproof - prompt injection can't be fully prevented by pattern matching. But it catches the most common attack vectors.
 
 ### 2. Output Anomaly Detection
 
@@ -85,7 +85,7 @@ def detect_anomalies(clause_text: str, result: ClassificationResult) -> List[str
 
     # Suspiciously low confidence on text with clear legal language
     if len(clause_text) > 200 and result.confidence < 0.3:
-        warnings.append("Low confidence on substantial text — possible injection or parsing issue")
+        warnings.append("Low confidence on substantial text - possible injection or parsing issue")
 
     return warnings
 ```
@@ -143,7 +143,7 @@ Add a `/privacy` page or section in the UI explaining this to users.
 
 | File | Change |
 |---|---|
-| `backend/app/core/security.py` | **NEW** — sanitization + anomaly detection |
+| `backend/app/core/security.py` | **NEW** - sanitization + anomaly detection |
 | `backend/app/services/classification_service.py` | Apply sanitization before LLM, check anomalies after |
 | `backend/app/api/documents.py` | Rate limiting on upload endpoints |
 | `backend/app/core/config.py` | Rate limit settings |

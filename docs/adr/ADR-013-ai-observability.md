@@ -1,7 +1,7 @@
-# ADR-013: AI Observability — LLM Monitoring and Cost Tracking
+# ADR-013: AI Observability - LLM Monitoring and Cost Tracking
 
 ## Status
-Accepted (Phase 1 implemented — classification traces)
+Accepted (Phase 1 implemented - classification traces)
 
 ## Date
 2026-03-28
@@ -39,7 +39,7 @@ Integrate **Langfuse** for LLM observability.
 | Cost | Free tier / self-host | Free tier then paid | Free tier then paid |
 | Vendor lock-in | None | Tied to LangChain | Proxy dependency |
 
-Langfuse covers all three needs: tracing, prompt management, and evaluations. It's open-source and self-hostable — important for a legal tech app handling confidential contracts.
+Langfuse covers all three needs: tracing, prompt management, and evaluations. It's open-source and self-hostable - important for a legal tech app handling confidential contracts.
 
 ### What to Track
 

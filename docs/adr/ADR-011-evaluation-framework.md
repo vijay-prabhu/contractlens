@@ -1,7 +1,7 @@
-# ADR-011: Evaluation Framework — Measuring Classification Quality
+# ADR-011: Evaluation Framework - Measuring Classification Quality
 
 ## Status
-Accepted (implemented — baseline: 96.6% type accuracy, 93.1% level accuracy)
+Accepted (implemented - baseline: 96.6% type accuracy, 93.1% level accuracy)
 
 ## Date
 2026-03-28
@@ -16,7 +16,7 @@ ContractLens classifies contract clauses using GPT-4o-mini and assigns risk scor
 - **Risk level accuracy**: When the model says "high risk", how often is it actually high risk?
 - **Risk score calibration**: Do clauses scored 0.7 actually represent more risk than clauses scored 0.4?
 - **Error rate**: What percentage of classifications are wrong?
-- **Regression detection**: If we change the prompt, model, or chunking — did quality improve or degrade?
+- **Regression detection**: If we change the prompt, model, or chunking - did quality improve or degrade?
 - **Domain coverage**: Are there clause types in real contracts that our 15-type taxonomy doesn't cover?
 
 ### Why this matters
@@ -27,10 +27,10 @@ Every improvement we make (ADR-008 risk scoring, ADR-009 structured outputs, ADR
 
 | Dataset | Size | Task | Relevance |
 |---|---|---|---|
-| **ContractEval** (2025) | 41 risk categories, commercial contracts | Clause-level risk identification | High — direct match to our task |
-| **LegalBench** | 162 tasks across legal reasoning | Broad legal NLP evaluation | Medium — includes clause classification |
-| **CUAD** | 13,101 labeled clauses from 510 contracts | 41 clause categories | High — largest labeled contract dataset |
-| **ACORD** (2025) | Expert-annotated contract clauses | Clause retrieval and identification | High — expert labels |
+| **ContractEval** (2025) | 41 risk categories, commercial contracts | Clause-level risk identification | High - direct match to our task |
+| **LegalBench** | 162 tasks across legal reasoning | Broad legal NLP evaluation | Medium - includes clause classification |
+| **CUAD** | 13,101 labeled clauses from 510 contracts | 41 clause categories | High - largest labeled contract dataset |
+| **ACORD** (2025) | Expert-annotated contract clauses | Clause retrieval and identification | High - expert labels |
 
 ## Decision
 
@@ -38,13 +38,13 @@ Every improvement we make (ADR-008 risk scoring, ADR-009 structured outputs, ADR
 
 Create a human-labeled dataset from actual ContractLens documents:
 
-**Phase 1 — Bootstrap from existing data (50 clauses):**
+**Phase 1 - Bootstrap from existing data (50 clauses):**
 - Pull 50 classified clauses spanning all 15 types and 4 risk levels
 - Manually review and correct labels
 - Include boundary cases (clauses that could be multiple types)
 - Store as `tests/evaluation/gold_standard.json`
 
-**Phase 2 — Expand with external data (200+ clauses):**
+**Phase 2 - Expand with external data (200+ clauses):**
 - Sample from CUAD dataset (already labeled with 41 categories, map to our 15)
 - Include ContractEval benchmark samples
 - Target: 10-15 clauses per type, balanced across risk levels
@@ -124,7 +124,7 @@ confidentiality      0    0    0    10    0    0    0
 payment_terms        0    0    0     0     8    0    2
 ```
 
-This directly informs few-shot example selection (ADR-009) — add examples for the most confused pairs.
+This directly informs few-shot example selection (ADR-009) - add examples for the most confused pairs.
 
 ### 5. A/B Testing Framework for Model Changes
 
@@ -182,9 +182,9 @@ def compare_models(test_set, model_a, model_b):
 - Test set needs ongoing maintenance as clause types evolve
 
 ### Trade-offs
-- Starting with 50 clauses rather than 500 — enough to detect major issues, not enough for statistical significance on rare types
-- Manual review rather than crowdsourced labeling — higher quality, slower to scale
-- Not implementing continuous evaluation in CI yet — run manually until the framework proves useful
+- Starting with 50 clauses rather than 500 - enough to detect major issues, not enough for statistical significance on rare types
+- Manual review rather than crowdsourced labeling - higher quality, slower to scale
+- Not implementing continuous evaluation in CI yet - run manually until the framework proves useful
 
 ## References
 - [ContractEval: Benchmarking LLMs for Clause-Level Legal Risk](https://arxiv.org/abs/2508.03080)

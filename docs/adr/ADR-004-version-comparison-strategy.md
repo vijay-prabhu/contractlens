@@ -168,7 +168,7 @@ def calculate_risk_delta(v1_clauses: list, v2_clauses: list) -> RiskDelta:
 - **Threshold sensitivity**: Fixed thresholds may not work for all document types
 - **Embedding limitations**: Very short clauses may have less reliable embeddings
 - **No clause splitting detection**: If one clause is split into two, detection is imperfect
-- **Chunk-level granularity mismatch**: See [Addendum — Findings from Real-World Testing](#addendum--findings-from-real-world-testing) below
+- **Chunk-level granularity mismatch**: See [Addendum - Findings from Real-World Testing](#addendum--findings-from-real-world-testing) below
 
 ### Trade-offs Accepted
 
@@ -210,7 +210,7 @@ def calculate_risk_delta(v1_clauses: list, v2_clauses: list) -> RiskDelta:
 
 ## Future Enhancements
 
-1. **Section-aware comparison** (Priority — see Addendum): Compare at logical section level, not chunk level
+1. **Section-aware comparison** (Priority - see Addendum): Compare at logical section level, not chunk level
 2. **User-adjustable thresholds**: Let power users tune sensitivity
 3. **Clause type weighting**: Prioritize changes in high-risk clause types
 4. **Change explanation**: Use LLM to summarize what changed in plain language
@@ -224,7 +224,7 @@ def calculate_risk_delta(v1_clauses: list, v2_clauses: list) -> RiskDelta:
 
 ---
 
-## Addendum — Findings from Real-World Testing
+## Addendum - Findings from Real-World Testing
 
 ### Problem: Chunk-Level Comparison Produces Misleading Results
 
@@ -290,7 +290,7 @@ Despite the chunk-level issues, the core semantic comparison logic worked well:
 | Audit Rights addition detected | Both chunks correctly marked as "Added" |
 | Payment terms change detected | Correctly identified Net-60 → Net-120 modification |
 | Confidentiality duration change detected | Caught the 5-year → 3-year change at 69% similarity |
-| Overall risk trend accurate | 0.40 → 0.41 (unchanged) — net effect of increases and decreases balanced out |
+| Overall risk trend accurate | 0.40 → 0.41 (unchanged) - net effect of increases and decreases balanced out |
 
 ### Proposed Fix: Section-Aware Comparison
 
@@ -336,16 +336,16 @@ def normalize_section_text(text: str) -> str:
 |--------|----------------------|--------------------------|
 | Change count accuracy | ~36 items (inflated 2.5x) | ~14 items (matches reality) |
 | False "Modified" rate | ~60% of modifications are false positives | Near zero with section matching |
-| User trust | Low — confusing inflated counts | High — matches user's mental model |
-| Implementation effort | Already built | Medium — ~2 weeks for phases 1-3 |
+| User trust | Low - confusing inflated counts | High - matches user's mental model |
+| Implementation effort | Already built | Medium - ~2 weeks for phases 1-3 |
 
 ---
 
-## Addendum 2 — pgvector Nearest-Neighbor Optimization (2026-03-28)
+## Addendum 2 - pgvector Nearest-Neighbor Optimization (2026-03-28)
 
 ### Problem: O(n²) In-Memory Similarity Calculations
 
-The original `_compare_clauses` implementation used a double nested loop — for each old clause, it iterated all new clauses and computed cosine similarity in Python. This meant:
+The original `_compare_clauses` implementation used a double nested loop - for each old clause, it iterated all new clauses and computed cosine similarity in Python. This meant:
 
 - 33 clauses × 33 clauses = 1,089 similarity calculations
 - Each calculation iterated 1,536 floats in a Python loop
@@ -376,7 +376,7 @@ For each old clause, one HNSW probe finds the closest match in the new version's
 | Algorithm | O(n × m) Python cosine similarity | O(n log m) HNSW index probes |
 | Similarity computation | Python loop over 1,536 floats | pgvector C extension |
 | Network round-trips | 0 (in-memory) | n small queries (same DB session) |
-| Double-loop for partial match | Yes (second O(n × m) pass) | No — single query finds best match at any threshold |
+| Double-loop for partial match | Yes (second O(n × m) pass) | No - single query finds best match at any threshold |
 
 ### Additional Optimizations
 

@@ -1,4 +1,4 @@
-# ADR-009: Classification Quality — Structured Outputs, Few-Shot, and Guardrails
+# ADR-009: Classification Quality - Structured Outputs, Few-Shot, and Guardrails
 
 ## Status
 Accepted (implemented)
@@ -32,15 +32,15 @@ result_text = response.choices[0].message.content.strip()
 
 The prompt says "Respond ONLY with valid JSON" but we parse the response as free text. When GPT wraps the JSON in markdown code blocks, we regex-extract it. When it returns invalid JSON, we catch the exception and silently default to `clause_type: "other", risk_score: 0.0`. There's no schema enforcement.
 
-OpenAI's Structured Outputs API (`response_format: { type: "json_schema" }`) guarantees 100% schema compliance — the model physically cannot return malformed output. GPT-4o-mini supports this since 2024-07-18.
+OpenAI's Structured Outputs API (`response_format: { type: "json_schema" }`) guarantees 100% schema compliance - the model physically cannot return malformed output. GPT-4o-mini supports this since 2024-07-18.
 
 **2. Zero-shot classification (quality: MEDIUM)**
 
-The prompt defines 15 clause types with one-line descriptions but provides zero examples of correct classification. Research consistently shows few-shot prompting improves classification accuracy 10-25% over zero-shot. Legal clause classification has nuanced boundaries — "indemnification" vs "limitation_of_liability" can overlap in the same sentence.
+The prompt defines 15 clause types with one-line descriptions but provides zero examples of correct classification. Research consistently shows few-shot prompting improves classification accuracy 10-25% over zero-shot. Legal clause classification has nuanced boundaries - "indemnification" vs "limitation_of_liability" can overlap in the same sentence.
 
 **3. Self-reported confidence is uncalibrated (grounding: MEDIUM)**
 
-The model returns a `confidence` field (0.0-1.0), but LLM self-reported confidence is poorly calibrated — models are often confidently wrong. The confidence score is stored per clause but never used for any decision. Low-confidence results look identical to high-confidence ones in the UI.
+The model returns a `confidence` field (0.0-1.0), but LLM self-reported confidence is poorly calibrated - models are often confidently wrong. The confidence score is stored per clause but never used for any decision. Low-confidence results look identical to high-confidence ones in the UI.
 
 **4. Silent error fallback masks failures (reliability: MEDIUM)**
 
@@ -59,7 +59,7 @@ This is indistinguishable from a genuine "other/low" classification in the UI. W
 
 **5. Temperature 0.1 allows non-determinism**
 
-The same clause text can produce different risk scores across runs. For a legal tool, reproducibility matters — the same contract should get the same classification every time. Temperature 0 gives deterministic output.
+The same clause text can produce different risk scores across runs. For a legal tool, reproducibility matters - the same contract should get the same classification every time. Temperature 0 gives deterministic output.
 
 **6. Model not version-pinned**
 
@@ -103,15 +103,15 @@ This eliminates all JSON parsing code, the markdown regex fallback, and the `_pa
 Add 3-4 examples to the system prompt covering boundary cases:
 
 ```
-Example 1 — Indemnification (high risk):
+Example 1 - Indemnification (high risk):
 Text: "Provider shall indemnify, defend, and hold harmless Client from any claims arising from Provider's breach..."
 Output: { "clause_type": "indemnification", "risk_level": "high", "risk_score": 0.75, ... }
 
-Example 2 — Limitation of Liability (critical risk):
+Example 2 - Limitation of Liability (critical risk):
 Text: "IN NO EVENT SHALL EITHER PARTY'S AGGREGATE LIABILITY EXCEED THE FEES PAID IN THE PRIOR 12 MONTHS..."
 Output: { "clause_type": "limitation_of_liability", "risk_level": "medium", "risk_score": 0.55, ... }
 
-Example 3 — Notice (low risk):
+Example 3 - Notice (low risk):
 Text: "All notices under this Agreement shall be in writing and delivered to the addresses set forth above..."
 Output: { "clause_type": "notice", "risk_level": "low", "risk_score": 0.13, ... }
 ```
@@ -155,7 +155,7 @@ response = client.beta.chat.completions.parse(
 
 ### 5. Use Confidence Score for Quality Gating
 
-Add a confidence threshold — clauses classified with confidence < 0.6 get flagged:
+Add a confidence threshold - clauses classified with confidence < 0.6 get flagged:
 
 ```python
 if result.confidence < 0.6:
@@ -177,7 +177,7 @@ This doesn't change the stored result but signals to the user that the classific
 ## Consequences
 
 ### Positive
-- Zero JSON parsing failures — schema enforced by the API
+- Zero JSON parsing failures - schema enforced by the API
 - More accurate classifications from few-shot examples
 - Failures are visible instead of hidden
 - Reproducible results from temperature 0 and model pinning
@@ -190,8 +190,8 @@ This doesn't change the stored result but signals to the user that the classific
 
 ### Trade-offs
 - Using 3-4 few-shot examples rather than fine-tuning (simpler to iterate on, no training pipeline needed)
-- Confidence threshold of 0.6 is a starting point — needs tuning with the evaluation framework (ADR-011)
-- Not switching to a different model yet — evaluate first with ADR-011's framework, then decide
+- Confidence threshold of 0.6 is a starting point - needs tuning with the evaluation framework (ADR-011)
+- Not switching to a different model yet - evaluate first with ADR-011's framework, then decide
 
 ## References
 - [OpenAI Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)

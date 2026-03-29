@@ -24,7 +24,7 @@ Profiling a real document comparison (v1: 30 clauses, v2: 33 clauses) exposed ho
 | Medium risk clauses | 12 | 16 | +4 |
 | Low risk clauses | 13 | 11 | -2 |
 
-V2 is clearly riskier — more high/medium clauses, higher total exposure, risk shifting upward across the distribution. But the UI showed "0.4 → 0.4, Unchanged" because:
+V2 is clearly riskier - more high/medium clauses, higher total exposure, risk shifting upward across the distribution. But the UI showed "0.4 → 0.4, Unchanged" because:
 
 1. **Averaging dilutes risk.** Adding low-risk clauses to a risky document lowers the average. A contract with 1 critical clause and 99 boilerplate clauses would score as "low risk".
 2. **The trend threshold (0.05 absolute) is too coarse.** A 6.7% relative increase doesn't cross the 0.05 absolute threshold, so it's labeled "unchanged".
@@ -35,13 +35,13 @@ V2 is clearly riskier — more high/medium clauses, higher total exposure, risk 
 
 Research into how production legal tech and security systems handle this:
 
-**CVSS (Common Vulnerability Scoring System)** — The security industry's standard for aggregating multiple vulnerability findings. The maximum finding drives the overall score. A system with 100 low vulns and 1 critical is rated "critical". Uses multi-factor scoring: exploitability × impact × scope.
+**CVSS (Common Vulnerability Scoring System)** - The security industry's standard for aggregating multiple vulnerability findings. The maximum finding drives the overall score. A system with 100 low vulns and 1 critical is rated "critical". Uses multi-factor scoring: exploitability × impact × scope.
 
-**OWASP Risk Rating** — `Risk = Likelihood × Impact` with weighted factors per dimension. Supports tuning weights per business context. Aggregates using highest-risk or decay-weighted approach.
+**OWASP Risk Rating** - `Risk = Likelihood × Impact` with weighted factors per dimension. Supports tuning weights per business context. Aggregates using highest-risk or decay-weighted approach.
 
-**Legal tech platforms (Sirion, LexCheck)** — Multi-layered architecture. Risk scored per clause type with severity weights. Document-level risk driven by highest-severity findings, not averages. Some use comparison against standard contract databases to benchmark what's "normal" for a given clause type.
+**Legal tech platforms (Sirion, LexCheck)** - Multi-layered architecture. Risk scored per clause type with severity weights. Document-level risk driven by highest-severity findings, not averages. Some use comparison against standard contract databases to benchmark what's "normal" for a given clause type.
 
-**ContractEval benchmark (2025)** — 41 legal risk categories. Evaluates correctness and effectiveness as separate dimensions, acknowledging that a single number can't capture everything.
+**ContractEval benchmark (2025)** - 41 legal risk categories. Evaluates correctness and effectiveness as separate dimensions, acknowledging that a single number can't capture everything.
 
 The common pattern: **maximum-driven scoring with weighted contributions, not simple averaging.**
 
@@ -61,7 +61,7 @@ document_risk = (
 
 **Why these components:**
 
-- **Max clause score (40%)**: A single critical indemnification clause makes the whole contract risky, regardless of how many safe clauses exist. This matches how lawyers actually evaluate contracts — they focus on the worst terms.
+- **Max clause score (40%)**: A single critical indemnification clause makes the whole contract risky, regardless of how many safe clauses exist. This matches how lawyers actually evaluate contracts - they focus on the worst terms.
 - **Top-N weighted average (35%)**: Looks at the 5 riskiest clauses, weighted by their clause type severity. Captures whether risk is concentrated in one clause or spread across several. Uses the existing `CLAUSE_TYPE_RISK_WEIGHTS` from `classification_service.py`.
 - **Concentration penalty (25%)**: Scales with the proportion of clauses above medium risk (score > 0.4). A document where 80% of clauses are medium+ risk is worse than one where only 10% are, even if the max score is the same.
 
@@ -153,7 +153,7 @@ This means a high-risk indemnification clause (weight 0.8) contributes more than
 | All clauses medium (0.45) | avg = 0.45 → "medium" | concentration penalty pushes to high end of medium |
 | 0 clauses (empty document) | 0.0 | 0.0 (no change) |
 | 1 clause only | avg = that clause | max = top_n = that clause (formula still works) |
-| All clauses identical score | avg = that score | Same result — max and avg converge |
+| All clauses identical score | avg = that score | Same result - max and avg converge |
 | V2 adds many low-risk clauses | avg drops → "decreased" | Max/top-N unchanged → correctly shows "unchanged" |
 | Clause goes low→critical | Not tracked | Flagged as risk escalation |
 
@@ -163,7 +163,7 @@ This means a high-risk indemnification clause (weight 0.8) contributes more than
 
 | File | Change |
 |---|---|
-| `backend/app/services/risk_scoring.py` | **New file** — document-level risk scoring functions |
+| `backend/app/services/risk_scoring.py` | **New file** - document-level risk scoring functions |
 | `backend/app/services/comparison_service.py` | Use new scoring for `_compute_risk_summary`, add transition tracking |
 | `backend/app/api/documents.py` | Use new scoring for document analysis response |
 | `backend/app/api/schemas.py` | Add `risk_escalations`, `risk_deescalations` to comparison schema |
@@ -189,19 +189,19 @@ No database migration needed. Risk scores stored on clauses don't change. Only t
 
 ### Negative
 
-- Slightly more complex scoring — harder to explain "why is this 0.62?" to users
-- Max-driven scoring is more conservative — documents will generally score higher than before
+- Slightly more complex scoring - harder to explain "why is this 0.62?" to users
+- Max-driven scoring is more conservative - documents will generally score higher than before
 - Existing documents will show different risk scores after the change (no stored scores change, but displayed aggregation changes)
 
 ### Trade-offs accepted
 
 - Using a fixed formula rather than a learned/tunable model (simplicity over personalization for now)
-- Top-5 for the weighted average is a chosen constant — could be made relative to document size later
-- Concentration penalty uses a linear scale — could use a sigmoid for smoother behavior at extremes
+- Top-5 for the weighted average is a chosen constant - could be made relative to document size later
+- Concentration penalty uses a linear scale - could use a sigmoid for smoother behavior at extremes
 
 ## Future Enhancements
 
-1. **Multi-dimensional risk**: Separate scores for financial exposure, compliance risk, and operational risk — surfaced as a radar chart rather than a single number
+1. **Multi-dimensional risk**: Separate scores for financial exposure, compliance risk, and operational risk - surfaced as a radar chart rather than a single number
 2. **Benchmark comparison**: Score against a corpus of "standard" contracts to show how a document compares to market norms
 3. **User-tunable weights**: Let legal teams adjust clause type weights based on their risk appetite
 4. **Confidence-weighted scoring**: Use the classification confidence score to discount uncertain assessments

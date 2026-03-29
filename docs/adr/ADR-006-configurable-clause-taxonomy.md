@@ -7,12 +7,12 @@ Partially Implemented (Phase 1 + Phase 3)
 - **Phase 1**: `config/clause_types.yaml` as single source of truth
 - **Phase 1**: Dynamic prompt builder from YAML config (`clause_taxonomy.py`)
 - **Phase 1**: Risk weights loaded from YAML instead of hardcoded dict
-- **Phase 2**: Validation logging — unknown types from LLM are logged with suggestion to add to YAML
+- **Phase 2**: Validation logging - unknown types from LLM are logged with suggestion to add to YAML
 - **Phase 3**: 8 new built-in types added (23 total, was 15):
-  - `non_compete` (0.70) — was classified as "other"
-  - `data_protection` (0.65) — was classified as "confidentiality"
-  - `audit_rights` (0.50) — was classified as "other"
-  - `representations` (0.40) — was classified as "warranty"
+  - `non_compete` (0.70) - was classified as "other"
+  - `data_protection` (0.65) - was classified as "confidentiality"
+  - `audit_rights` (0.50) - was classified as "other"
+  - `representations` (0.40) - was classified as "warranty"
   - `insurance` (0.50)
   - `exclusivity` (0.60)
   - `service_levels` (0.55)
@@ -81,15 +81,15 @@ Real-world contracts contain clause types not in the current taxonomy:
 | `service_levels` / `SLA` | SaaS, managed services | Uptime guarantees, response times, credits |
 | `change_of_control` | M&A, licensing | Rights triggered by acquisition or merger |
 
-Currently, all of these fall into `other` — losing their specific risk context and domain weight.
+Currently, all of these fall into `other` - losing their specific risk context and domain weight.
 
 ### Problems with the Current Approach
 
-1. **Adding a new type requires code changes in 3 files** — easy to miss one and create inconsistency
-2. **No user customization** — different industries have different clause taxonomies (healthcare contracts vs. construction vs. SaaS)
-3. **`other` is a black hole** — ~15-20% of clauses in test documents land in `other`, losing their specific risk context
-4. **Validation silently downgrades** — if GPT-4o-mini returns a type not in the enum, `_validate_result()` (line 219) silently converts it to `other` instead of flagging the gap
-5. **Risk weights are developer-defined** — legal teams may disagree with the relative weights (e.g., `governing_law` at 0.30 may be too low for cross-border contracts)
+1. **Adding a new type requires code changes in 3 files** - easy to miss one and create inconsistency
+2. **No user customization** - different industries have different clause taxonomies (healthcare contracts vs. construction vs. SaaS)
+3. **`other` is a black hole** - ~15-20% of clauses in test documents land in `other`, losing their specific risk context
+4. **Validation silently downgrades** - if GPT-4o-mini returns a type not in the enum, `_validate_result()` (line 219) silently converts it to `other` instead of flagging the gap
+5. **Risk weights are developer-defined** - legal teams may disagree with the relative weights (e.g., `governing_law` at 0.30 may be too low for cross-border contracts)
 
 ## Decision
 
@@ -163,7 +163,7 @@ def build_classification_prompt(clause_types: dict) -> str:
 ```
 
 **Benefits:**
-- Prompt always matches the config — no sync issues
+- Prompt always matches the config - no sync issues
 - Custom types automatically appear in the LLM prompt
 - Can be rebuilt at startup or when config changes
 
@@ -271,28 +271,28 @@ This surfaces types the LLM wants to use but can't, informing future taxonomy ex
 
 **Pros**: Single storage mechanism, editable via admin UI
 **Cons**: Requires DB access to change built-in types, no version control, harder to deploy defaults
-**Decision**: Rejected — YAML for built-in types provides version control and easy deployment; DB for user custom types provides persistence and per-user isolation
+**Decision**: Rejected - YAML for built-in types provides version control and easy deployment; DB for user custom types provides persistence and per-user isolation
 
 ### 2. Keep Hardcoded, Add More Types
 
 **Pros**: Simplest change, just expand the enum
 **Cons**: Still requires 3-file code changes, no user customization, same maintenance burden
-**Decision**: Rejected — doesn't solve the root problem of rigidity
+**Decision**: Rejected - doesn't solve the root problem of rigidity
 
 ### 3. Fully Dynamic (No Built-in Types)
 
 **Pros**: Maximum flexibility
 **Cons**: New users start with empty taxonomy, must configure before first use, no sensible defaults
-**Decision**: Rejected — the 15+ built-in types provide immediate value out of the box
+**Decision**: Rejected - the 15+ built-in types provide immediate value out of the box
 
 ## Related: Perspective-Aware Risk Scoring
 
 A separate but closely related gap: the current classification prompt does not specify which party's perspective to assess risk from. The same clause change can be risk-reducing for one party and risk-increasing for the other. Combined with the domain weight floor from the hybrid formula, this means risk score reductions are harder to observe than expected.
 
-This is tracked as a v2.0 enhancement alongside the configurable taxonomy work. See [ADR-003 — Known Limitation: No Party Perspective](ADR-003-llm-classification-strategy.md#known-limitation-no-party-perspective-in-risk-scoring) for the proposed fix (party selection + dual scoring).
+This is tracked as a v2.0 enhancement alongside the configurable taxonomy work. See [ADR-003 - Known Limitation: No Party Perspective](ADR-003-llm-classification-strategy.md#known-limitation-no-party-perspective-in-risk-scoring) for the proposed fix (party selection + dual scoring).
 
 ## References
 
-- [ADR-003: LLM Classification Strategy](ADR-003-llm-classification-strategy.md) — covers model selection, hybrid scoring, and perspective-aware scoring proposal
+- [ADR-003: LLM Classification Strategy](ADR-003-llm-classification-strategy.md) - covers model selection, hybrid scoring, and perspective-aware scoring proposal
 - [YAML Configuration Best Practices](https://yaml.org/spec/1.2.2/)
 - [Pydantic Settings with YAML](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)

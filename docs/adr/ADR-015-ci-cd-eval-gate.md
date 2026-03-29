@@ -12,7 +12,7 @@ ContractLens has an evaluation framework (ADR-011) that measures classification 
 
 ### Industry Standard
 
-Production LLM applications in 2026 run automated eval suites on every PR that touches AI-related code. The pipeline fails if quality metrics drop below thresholds — exactly like unit tests gate code changes.
+Production LLM applications in 2026 run automated eval suites on every PR that touches AI-related code. The pipeline fails if quality metrics drop below thresholds - exactly like unit tests gate code changes.
 
 ### Current Baseline (2026-03-28)
 

@@ -126,16 +126,16 @@ For production, consider:
 
 ## Known Limitation: No Party Perspective in Risk Scoring
 
-The current prompt does not specify which party's perspective to assess risk from. The same clause can be risk-reducing for one party and risk-increasing for the other (e.g., reducing confidentiality duration is less risk for the provider but more risk for the client). Additionally, the hybrid scoring formula `(LLM × 0.7) + (domain_weight × 0.3)` creates a floor per clause type — high-risk types like `limitation_of_liability` (weight 0.85) can never score below 0.255, limiting the observable range of risk reduction.
+The current prompt does not specify which party's perspective to assess risk from. The same clause can be risk-reducing for one party and risk-increasing for the other (e.g., reducing confidentiality duration is less risk for the provider but more risk for the client). Additionally, the hybrid scoring formula `(LLM × 0.7) + (domain_weight × 0.3)` creates a floor per clause type - high-risk types like `limitation_of_liability` (weight 0.85) can never score below 0.255, limiting the observable range of risk reduction.
 
 ### Proposed Fix: Perspective-Aware Scoring (v2.0)
 
-**Phase 1 — Party selection:**
+**Phase 1 - Party selection:**
 - Add `risk_perspective` parameter to the classification prompt (Provider / Client / Balanced)
 - User selects their party role when uploading a document
 - LLM assesses risk from the selected perspective
 
-**Phase 2 — Dual scoring:**
+**Phase 2 - Dual scoring:**
 - Score each clause from both party perspectives in a single LLM call
 - Store both scores (`risk_score_provider`, `risk_score_client`)
 - UI shows "Risk to You" vs "Risk to Counterparty"

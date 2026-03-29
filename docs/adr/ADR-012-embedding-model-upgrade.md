@@ -42,7 +42,7 @@ A 2-3% improvement in embedding quality directly translates to better search rel
 
 ### Phase 1: Upgrade to text-embedding-3-large
 
-Straightforward upgrade — same API, same provider, better quality:
+Straightforward upgrade - same API, same provider, better quality:
 
 | Metric | Small (current) | Large (proposed) |
 |---|---|---|
@@ -61,7 +61,7 @@ A typical document has 30-80 chunks × ~200 tokens per chunk = ~4,000-16,000 tok
 | Cost per 1,000 documents | $0.12 | $0.78 |
 | Monthly cost (100 docs/month) | $0.012 | $0.078 |
 
-The cost increase is negligible — $0.78 per 1,000 documents. The quality improvement is worth it.
+The cost increase is negligible - $0.78 per 1,000 documents. The quality improvement is worth it.
 
 **Dimension change (1536 → 3072):**
 
@@ -84,12 +84,12 @@ This gives most of the quality benefit (~63.5 MTEB) without changing the databas
 
 Once the evaluation framework (ADR-011) is in place, benchmark:
 
-1. **text-embedding-3-large (full 3072 dims)** — maximum quality from OpenAI
-2. **Cohere Embed v4** — competitive with OpenAI, offers search-optimized vs input-optimized variants
-3. **Legal domain fine-tuned models** — if the evaluation shows legal-specific terms are poorly embedded, fine-tune on contract corpus
-4. **Open-source alternatives** — BGE, GTE models if cost or data privacy becomes a concern
+1. **text-embedding-3-large (full 3072 dims)** - maximum quality from OpenAI
+2. **Cohere Embed v4** - competitive with OpenAI, offers search-optimized vs input-optimized variants
+3. **Legal domain fine-tuned models** - if the evaluation shows legal-specific terms are poorly embedded, fine-tune on contract corpus
+4. **Open-source alternatives** - BGE, GTE models if cost or data privacy becomes a concern
 
-Phase 2 depends on ADR-011 (evaluation framework) being implemented first — we need the measurement infrastructure to compare models meaningfully.
+Phase 2 depends on ADR-011 (evaluation framework) being implemented first - we need the measurement infrastructure to compare models meaningfully.
 
 ## Implementation
 
@@ -131,11 +131,11 @@ If full 3072 dimensions are needed:
 ## Consequences
 
 ### Positive
-- Better search relevance — improved MTEB score translates to better clause matching
-- Better comparison accuracy — fewer false matches between versions
+- Better search relevance - improved MTEB score translates to better clause matching
+- Better comparison accuracy - fewer false matches between versions
 - Negligible cost increase ($0.66/month more for 1000 documents)
 - No database migration needed with dimension reduction approach
-- Incremental upgrade — new documents get better embeddings, old documents upgraded via Reprocess
+- Incremental upgrade - new documents get better embeddings, old documents upgraded via Reprocess
 
 ### Negative
 - Slight latency increase for embedding generation (~100ms more per batch)
@@ -143,9 +143,9 @@ If full 3072 dimensions are needed:
 - Full 3072 dimensions would require migration and ~2x more vector storage
 
 ### Trade-offs
-- Using dimension reduction (1536 from large model) rather than full 3072 — simpler migration, most of the quality benefit
-- Not switching to a completely different embedding provider — staying with OpenAI for API consistency
-- Not fine-tuning yet — need evaluation framework first to measure the gap
+- Using dimension reduction (1536 from large model) rather than full 3072 - simpler migration, most of the quality benefit
+- Not switching to a completely different embedding provider - staying with OpenAI for API consistency
+- Not fine-tuning yet - need evaluation framework first to measure the gap
 
 ## References
 - [OpenAI Embeddings Guide](https://platform.openai.com/docs/guides/embeddings)

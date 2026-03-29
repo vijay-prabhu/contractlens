@@ -1,7 +1,7 @@
-# ADR-010: Document Parsing & Chunking — Docling Migration
+# ADR-010: Document Parsing & Chunking - Docling Migration
 
 ## Status
-Accepted (Phase 1 implemented — Docling + section chunking with PyMuPDF fallback)
+Accepted (Phase 1 implemented - Docling + section chunking with PyMuPDF fallback)
 
 ## Date
 2026-03-28
@@ -25,7 +25,7 @@ text = page.get_text("text")
 |---|---|---|
 | **Tables** | Cells dumped as flat text stream. `Party A 5.25% Fixed Party B SOFR+1%` | Payment schedules, fee grids, interest rate tables become unreadable |
 | **Headers/footers** | Extracted as regular text on every page | 200-page doc = 200 repeated noise lines, wasting classification API calls |
-| **Diagrams/images** | Completely lost — `get_text` only extracts text | Scanned contracts, image-embedded clauses invisible to the system |
+| **Diagrams/images** | Completely lost - `get_text` only extracts text | Scanned contracts, image-embedded clauses invisible to the system |
 | **Section hierarchy** | Flat text, no nesting | "Section 4.2(a)(iii)" loses its relationship to parent sections |
 | **Cross-references** | Split across chunks | "as defined in Section 2.1" becomes meaningless when Section 2.1 is in a different chunk |
 
@@ -45,7 +45,7 @@ An ISDA contract is typically 150+ pages (base agreement + schedules + credit su
 
 ```python
 contract_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800,        # ~200 tokens — too small
+    chunk_size=800,        # ~200 tokens - too small
     chunk_overlap=150,
     separators=["\n\n", "\nSection", "\nArticle", "\nClause", "\n", "; ", ". ", ...]
 )
@@ -112,7 +112,7 @@ def chunk_document(docling_doc, max_tokens=512):
         section_text = f"{section.title}\n\n{section.text}"
 
         if token_count(section_text) <= max_tokens:
-            # Section fits in one chunk — keep it whole
+            # Section fits in one chunk - keep it whole
             chunks.append(section_text)
         else:
             # Split within section, preserving header context
@@ -152,7 +152,7 @@ Instead of: `Payment Milestone Amount Due Date Phase 1 Delivery $250,000 March 1
 
 **OCR for scanned pages:** Docling detects image-only pages and runs OCR automatically. No configuration needed for standard quality scans.
 
-**Headers/footers:** Docling identifies and strips repeated page elements. No more "CONFIDENTIAL — Page X of 200" polluting 200 chunks.
+**Headers/footers:** Docling identifies and strips repeated page elements. No more "CONFIDENTIAL - Page X of 200" polluting 200 chunks.
 
 ### 4. ISDA Contract: Before vs After
 
@@ -169,7 +169,7 @@ Instead of: `Payment Milestone Amount Due Date Phase 1 Delivery $250,000 March 1
 
 ### 5. Backward Compatibility
 
-The change affects the extraction and chunking steps. Downstream services (embedding, classification, comparison, search) receive text strings — they don't care how the text was produced. No changes needed to:
+The change affects the extraction and chunking steps. Downstream services (embedding, classification, comparison, search) receive text strings - they don't care how the text was produced. No changes needed to:
 - Embedding service
 - Classification service (benefits from better input)
 - Search service
@@ -194,7 +194,7 @@ Existing documents in the database keep their current chunks/embeddings. New upl
 
 ### Phase 3: Remove old pipeline
 - Remove PyMuPDF extraction (or keep as lightweight fallback)
-- Remove LangChain `RecursiveCharacterTextSplitter` dependency (for chunking — LangChain may still be used elsewhere)
+- Remove LangChain `RecursiveCharacterTextSplitter` dependency (for chunking - LangChain may still be used elsewhere)
 - Remove `chunk_for_contracts` method
 
 ## Files to Modify
@@ -209,11 +209,11 @@ Existing documents in the database keep their current chunks/embeddings. New upl
 ## Consequences
 
 ### Positive
-- Tables, headers, sections preserved — dramatically better classification input
-- 7-10x fewer chunks per document — faster processing, lower cost
+- Tables, headers, sections preserved - dramatically better classification input
+- 7-10x fewer chunks per document - faster processing, lower cost
 - Section-level comparison becomes possible (fixes ADR-004's core issue)
 - OCR support for scanned contracts
-- Local execution — no data sent to external parsing APIs
+- Local execution - no data sent to external parsing APIs
 
 ### Negative
 - Docling is a heavier dependency (~500MB with OCR models)
@@ -222,9 +222,9 @@ Existing documents in the database keep their current chunks/embeddings. New upl
 - Need to verify Docling handles all contract formats we encounter
 
 ### Trade-offs
-- Using Docling (local, open-source) over LlamaParse (API, commercial) — avoids vendor lock-in and data privacy concerns
-- 512-token target rather than dynamic sizing — simpler implementation, can tune later
-- Not re-processing existing documents automatically — users trigger via Reprocess button
+- Using Docling (local, open-source) over LlamaParse (API, commercial) - avoids vendor lock-in and data privacy concerns
+- 512-token target rather than dynamic sizing - simpler implementation, can tune later
+- Not re-processing existing documents automatically - users trigger via Reprocess button
 
 ## References
 - [Docling: Get Your Documents Ready for Gen AI](https://github.com/docling-project/docling)

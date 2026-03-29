@@ -23,12 +23,12 @@ Document processing in ContractLens takes ~84 seconds for a 43KB PDF. I profiled
 | **Total** | **83.92s** | |
 
 Breaking down the AI step:
-- **Embeddings** (OpenAI text-embedding-3-small): 1.32s — one batch API call, fast
-- **Classification** (GPT-4o-mini): 80.31s — 30 sequential API calls, ~2.7s each
+- **Embeddings** (OpenAI text-embedding-3-small): 1.32s - one batch API call, fast
+- **Classification** (GPT-4o-mini): 80.31s - 30 sequential API calls, ~2.7s each
 
 ### Root Cause
 
-`classify_clauses_batch()` loops through chunks one at a time, making a separate GPT-4o-mini API call for each chunk. The CPU is idle 97% of the time — it's pure I/O wait.
+`classify_clauses_batch()` loops through chunks one at a time, making a separate GPT-4o-mini API call for each chunk. The CPU is idle 97% of the time - it's pure I/O wait.
 
 Supabase latency is not the issue. Storage + DB combined is under 2 seconds.
 
@@ -45,8 +45,8 @@ Phased optimization approach:
 Run classification calls concurrently using `asyncio.gather` with a concurrency limit of 5-10.
 
 - **Expected improvement**: ~80s → ~8-16s
-- **Effort**: Small — change `classify_clauses_batch` to use async + semaphore
-- **Risk**: Low — OpenAI rate limits are generous for gpt-4o-mini
+- **Effort**: Small - change `classify_clauses_batch` to use async + semaphore
+- **Risk**: Low - OpenAI rate limits are generous for gpt-4o-mini
 - **Trade-off**: Slightly higher burst API usage, but total tokens are identical
 
 ### Phase 2: Stream results to frontend (next)
@@ -54,7 +54,7 @@ Run classification calls concurrently using `asyncio.gather` with a concurrency 
 Show clauses appearing one by one as they're classified, instead of waiting for all 30 to complete. Pairs with the SSE approach from ADR-005.
 
 - **Expected improvement**: Perceived wait drops from ~10s to ~2-3s
-- **Effort**: Medium — needs frontend changes to handle progressive loading
+- **Effort**: Medium - needs frontend changes to handle progressive loading
 - **Risk**: Low
 
 ### Phase 3: Fine-tuned local classifier (later)
@@ -62,8 +62,8 @@ Show clauses appearing one by one as they're classified, instead of waiting for 
 Train a small model (BERT/DistilBERT, ~110M params) on the 14 clause types + risk levels using existing GPT-4o-mini outputs as training data. Run inference locally.
 
 - **Expected improvement**: 80s → <1s for all 30 chunks
-- **Effort**: High — needs training pipeline, model serving, evaluation
-- **Risk**: Medium — classification quality depends on training data volume and quality
+- **Effort**: High - needs training pipeline, model serving, evaluation
+- **Risk**: Medium - classification quality depends on training data volume and quality
 - **Trade-off**: Loses GPT-4o-mini's flexibility for edge cases. Hybrid approach (local model + LLM fallback for low-confidence results) mitigates this.
 
 ## Alternatives Considered
@@ -85,13 +85,13 @@ Asynchronous batch processing at 50% cost reduction.
 ### Caching by embedding similarity
 Cache classification results and reuse for chunks with >95% embedding similarity.
 
-- Legal contracts reuse boilerplate — high cache hit rate expected
+- Legal contracts reuse boilerplate - high cache hit rate expected
 - Good complement to any phase, not a standalone solution
 - Worth adding alongside Phase 1 or 2
 
 ## Consequences
 
 - Phase 1 gives immediate 5-10x speedup with minimal code change
-- Each phase builds on the previous — no throwaway work
+- Each phase builds on the previous - no throwaway work
 - Phase 3 requires accumulating enough classified data first, so Phase 1 serves double duty: faster processing AND training data generation
 - The profiling instrumentation (`[PERF]` logs) stays in place to measure improvements
