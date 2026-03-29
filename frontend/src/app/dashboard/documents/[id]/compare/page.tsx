@@ -22,7 +22,7 @@ import {
   ChevronUp,
 } from 'lucide-react'
 import { api } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { cn, formatClauseType } from '@/lib/utils'
 import type { ComparisonResult, ClauseChange } from '@/types'
 
 const riskIcons: Record<string, typeof AlertTriangle> = {
@@ -46,23 +46,6 @@ const changeTypeColors: Record<string, { bg: string; border: string; text: strin
   unchanged: { bg: 'bg-gray-50', border: 'border-l-4 border-l-gray-300', text: 'text-gray-600', icon: CheckCircle },
 }
 
-const clauseTypeLabels: Record<string, string> = {
-  indemnification: 'Indemnification',
-  limitation_of_liability: 'Limitation of Liability',
-  termination: 'Termination',
-  confidentiality: 'Confidentiality',
-  payment_terms: 'Payment Terms',
-  intellectual_property: 'Intellectual Property',
-  governing_law: 'Governing Law',
-  force_majeure: 'Force Majeure',
-  warranty: 'Warranty',
-  dispute_resolution: 'Dispute Resolution',
-  assignment: 'Assignment',
-  notice: 'Notice',
-  amendment: 'Amendment',
-  entire_agreement: 'Entire Agreement',
-  other: 'Other',
-}
 
 function SummaryCard({
   title,
@@ -138,7 +121,7 @@ function ClauseChangeCard({ change, expanded, onToggle }: { change: ClauseChange
         <div className="flex items-center gap-3">
           <Icon className={cn('h-4 w-4', style.text)} />
           <span className="font-medium text-gray-900">
-            {clauseTypeLabels[change.clause_type] || change.clause_type}
+            {formatClauseType(change.clause_type)}
           </span>
           <span className={cn('text-xs font-semibold px-2 py-0.5 rounded capitalize', style.bg, style.text)}>
             {change.change_type}

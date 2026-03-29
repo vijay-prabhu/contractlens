@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { POLLING_INTERVAL_MS } from '@/lib/constants'
-import { cn, formatDate, formatFileSize, getStatusColor } from '@/lib/utils'
+import { cn, formatDate, formatFileSize, formatClauseType, getStatusColor } from '@/lib/utils'
 import { useToast } from '@/components/toast'
 import type { Document, DocumentAnalysis, DocumentVersion, RiskLevel } from '@/types'
 
@@ -687,7 +687,7 @@ export default function DocumentDetailPage() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <h3 className="font-medium text-gray-900 capitalize">
-                          {clause.clause_type?.replace(/_/g, ' ') || 'General Clause'}
+                          {formatClauseType(clause.clause_type || 'other')}
                         </h3>
                         <div
                           className={cn(

@@ -15,7 +15,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { api } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { cn, formatClauseType } from '@/lib/utils'
 import type { SearchResult, Document } from '@/types'
 
 const riskIcons: Record<string, typeof AlertTriangle> = {
@@ -39,23 +39,6 @@ const riskBorderStyles: Record<string, string> = {
   low: 'border-l-4 border-l-green-500',
 }
 
-const clauseTypeLabels: Record<string, string> = {
-  indemnification: 'Indemnification',
-  limitation_of_liability: 'Limitation of Liability',
-  termination: 'Termination',
-  confidentiality: 'Confidentiality',
-  payment_terms: 'Payment Terms',
-  intellectual_property: 'Intellectual Property',
-  governing_law: 'Governing Law',
-  force_majeure: 'Force Majeure',
-  warranty: 'Warranty',
-  dispute_resolution: 'Dispute Resolution',
-  assignment: 'Assignment',
-  notice: 'Notice',
-  amendment: 'Amendment',
-  entire_agreement: 'Entire Agreement',
-  other: 'Other',
-}
 
 function SimilarityBadge({ similarity }: { similarity: number }) {
   const percentage = Math.round(similarity * 100)
@@ -320,7 +303,7 @@ export default function SearchPage() {
                       </div>
                       <span className="text-gray-300">•</span>
                       <span className="text-sm font-medium text-gray-700">
-                        {clauseTypeLabels[result.clause_type] || result.clause_type}
+                        {formatClauseType(result.clause_type)}
                       </span>
                     </div>
 

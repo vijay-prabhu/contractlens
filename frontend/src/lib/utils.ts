@@ -36,6 +36,13 @@ export function getRiskColor(level: string): string {
   }
 }
 
+export function formatClauseType(type: string): string {
+  return type
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 export function getStatusColor(status: string): string {
   switch (status.toLowerCase()) {
     case 'completed':
