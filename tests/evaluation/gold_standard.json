@@ -1,6 +1,30 @@
 [
   {
     "id": "gs-001",
+    "text": "MASTER SERVICE AGREEMENT - VERSION 2 This Master Service Agreement is entered into as of January 15, 2025. SECTION 1: CONFIDENTIALITY The receiving party agrees to maintain strict confidentiality of all proprietary information. This obligation shall survive for three (3) years after termination. SECTION 2: INDEMNIFICATION Provider shall defend, indemnify, and hold harmless Client from any and all claims. This indemnification shall be LIMITED TO THE TOTAL FEES PAID UNDER THIS AGREEMENT. SECTION 3: LIMITATION OF LIABILITY IN NO EVENT SHALL EITHER PARTY BE LIABLE FOR INDIRECT OR CONSEQUENTIAL DAMAGES. Total liability capped at 12 months of fees. SECTION 4: INTELLECTUAL PROPERTY All intellectual property developed shall be the exclusive property of Client. SECTION 5: TERMINATION Either party may terminate with 60 days notice. Immediate termination for material breach. SECTION 6: GOVERNING LAW Governed by laws of California. Disputes resolved through binding arbitration in San Francisco.",
+    "expected_clause_type": "confidentiality",
+    "expected_risk_level": "low",
+    "expected_risk_score_range": [
+      0.07,
+      0.37
+    ],
+    "notes": "Standard confidentiality clause with a clear obligation and a reasonable duration of three years post-termination. No unusual requirements or risks identified.",
+    "source": "manual_review_2026-03-28_v2"
+  },
+  {
+    "id": "gs-002",
+    "text": "SAMPLE CONTRACT AGREEMENT\n\nThis Agreement is entered into as of January 1, 2025.\n\nSection 1: CONFIDENTIALITY The receiving party agrees to maintain the confidentiality of all proprietary information disclosed by the other party. Section 2: INDEMNIFICATION Each party shall indemnify and hold harmless the other party from any claims arising from breach of this Agreement. Section 3: LIMITATION OF LIABILITY In no event shall either party be liable for any indirect, incidental, special, or consequential damages. Section 4: TERMINATION Either party may terminate this Agreement with 30 days notice.",
+    "expected_clause_type": "confidentiality",
+    "expected_risk_level": "low",
+    "expected_risk_score_range": [
+      0.07,
+      0.37
+    ],
+    "notes": "Standard confidentiality clause requiring both parties to maintain confidentiality of proprietary information. No unusual terms or obligations.",
+    "source": "manual_review_2026-03-28_v2"
+  },
+  {
+    "id": "gs-003",
     "text": "MASTER TECHNOLOGY SERVICES AGREEMENT\n\nAgreement No. MTS-2025-0472 Effective Date: January 15, 2025\n\nThis Master Technology Services Agreement (\"Agreement\") is entered into between NovaTech Solutions Inc., a Delaware corporation (\"Provider\"), and Meridian Global Enterprises LLC, a New York limited liability company (\"Client\"). This Agreement governs the terms and conditions under which Provider shall deliver technology consulting, software development, and related professional services to Client.",
     "expected_clause_type": "other",
     "expected_risk_level": "low",
@@ -9,34 +33,34 @@
       0.31
     ],
     "notes": "This introductory clause outlines the parties involved and the general purpose of the agreement. It does not contain any specific obligations or risks.",
-    "source": "manual_review_2026-03-28"
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-002",
+    "id": "gs-004",
     "text": "Section 1. INDEMNIFICATION\n\nProvider shall indemnify, defend, and hold harmless Client and its officers, directors, employees, agents, successors, and assigns from and against any and all claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees and court costs) arising out of or relating to: (a) any breach of this Agreement by Provider; (b) any negligent or wrongful act or omission of Provider or its personnel; (c) any infringement or misappropriation of any intellectual property rights; (d) any violation of applicable laws or regulations by Provider; (e) any personal injury or property damage caused by Provider's personnel; and (f) any third-party claims arising from Provider's performance or failure to perform under this Agreement. This indemnification obligation shall survive the termination or expiration of this Agreement and shall apply without limitation as to the amount of damages, regardless of whether such claims are based in contract, tort, strict liability, or any other legal theory. Provider's indemnification obligations hereunder are unconditional and shall not be subject to any cap, ceiling, or maximum aggregate amount.",
     "expected_clause_type": "indemnification",
     "expected_risk_level": "critical",
     "expected_risk_score_range": [
-      0.72,
-      1.0
+      0.68,
+      0.98
     ],
-    "notes": "The clause imposes broad and unconditional indemnification obligations on the Provider without any cap on liability, exposing them to potentially unlimited financial risk. It covers a wide range of sc",
-    "source": "manual_review_2026-03-28"
+    "notes": "The clause imposes broad and unconditional indemnification obligations on the Provider without any cap on liability, exposing them to significant financial risk. It covers a wide range of potential cl",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-003",
+    "id": "gs-005",
     "text": "Section 2. LIMITATION OF LIABILITY\n\nEXCEPT FOR PROVIDER'S INDEMNIFICATION OBLIGATIONS AND BREACHES OF CONFIDENTIALITY, IN NO EVENT SHALL EITHER PARTY BE LIABLE TO THE OTHER PARTY FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, LOSS OF REVENUE, LOSS OF DATA, OR BUSINESS INTERRUPTION, REGARDLESS OF THE CAUSE OF ACTION OR THE THEORY OF LIABILITY, EVEN IF SUCH PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. NOTWITHSTANDING THE FOREGOING, EACH PARTY'S TOTAL AGGREGATE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED TEN TIMES (10X) THE TOTAL FEES PAID OR PAYABLE UNDER THIS AGREEMENT DURING THE TWELVE (12) MONTH PERIOD IMMEDIATELY PRECEDING THE EVENT GIVING RISE TO THE CLAIM. This limitation applies collectively to all claims arising under or related to this Agreement.",
     "expected_clause_type": "limitation_of_liability",
     "expected_risk_level": "medium",
     "expected_risk_score_range": [
-      0.45,
-      0.76
+      0.49,
+      0.79
     ],
-    "notes": "The clause limits liability for indirect and consequential damages, which is standard. However, the cap of 10x total fees may be excessive depending on the contract value, and the broad exclusion of d",
-    "source": "manual_review_2026-03-28"
+    "notes": "The clause limits liability significantly, excluding indirect damages and capping total liability at 10x fees. While it provides some protection, the cap may be insufficient for high-value contracts, ",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-004",
+    "id": "gs-006",
     "text": "Section 3. INTELLECTUAL PROPERTY RIGHTS\n\nAll work product, deliverables, inventions, discoveries, improvements, software code, documentation, designs, and any other materials created by Provider in the course of performing services under this Agreement (\"Work Product\") shall be considered \"work made for hire\" as defined under the United States Copyright Act. To the extent any Work Product does not qualify as work made for hire, Provider hereby irrevocably assigns to Client all right, title, and interest in and to such Work Product, including all intellectual property rights therein. Provider further assigns to Client all patent rights, copyrights, trade secret rights, and any other proprietary rights in the Work Product worldwide, in perpetuity. Provider shall not retain any rights to use, license, or distribute the Work Product or any derivative works thereof without the prior written consent of Client. Provider shall execute all documents and take all actions reasonably requested by Client to perfect Client's ownership of the Work Product.",
     "expected_clause_type": "intellectual_property",
     "expected_risk_level": "high",
@@ -44,35 +68,35 @@
       0.62,
       0.92
     ],
-    "notes": "The clause heavily favors the Client by assigning all rights to the Work Product without allowing the Provider to retain any rights. This could limit the Provider's ability to use their own creations ",
-    "source": "manual_review_2026-03-28"
+    "notes": "The clause assigns all intellectual property rights to the Client, leaving the Provider with no rights to use or license the Work Product. This could significantly limit the Provider's future business",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-005",
+    "id": "gs-007",
     "text": "Section 4. NON-COMPETITION AND NON-SOLICITATION\n\nDuring the term of this Agreement and for a period of twenty-four (24) months following its termination or expiration, Provider agrees that it shall not, directly or indirectly: (a) engage in or provide services that are substantially similar to the services provided under this Agreement to any Competing Business within the Territory; (b) solicit, recruit, or hire any employee, contractor, or consultant of Client; (c) solicit or attempt to divert any business from Client's existing or prospective customers; or (d) encourage any client, customer, or vendor of Client to terminate or reduce its business relationship with Client. For purposes of this Section, \"Competing Business\" means any entity that provides technology consulting, software development, or IT services, and \"Territory\" means the United States, Canada, the United Kingdom, and the European Union. Provider acknowledges that the restrictions contained herein are reasonable and necessary to protect Client's legitimate business interests.",
-    "expected_clause_type": "other",
+    "expected_clause_type": "non_compete",
     "expected_risk_level": "high",
     "expected_risk_score_range": [
-      0.4,
-      0.7
+      0.58,
+      0.89
     ],
-    "notes": "The non-competition and non-solicitation clause imposes significant restrictions on the Provider for an extended period (24 months) and across a broad territory, which may limit Provider's future busi",
-    "source": "manual_review_2026-03-28"
+    "notes": "The clause imposes a 24-month non-compete and non-solicitation period with a broad definition of 'Competing Business' and 'Territory', significantly restricting Provider's ability to operate post-term",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-006",
+    "id": "gs-008",
     "text": "Section 5. TERMINATION\n\nEither party may terminate this Agreement for convenience upon thirty (30) days prior written notice to the other party. Either party may terminate this Agreement immediately upon written notice if the other party: (a) materially breaches any provision of this Agreement and fails to cure such breach within fifteen (15) days after receiving written notice thereof; (b) becomes insolvent, files for bankruptcy, or makes an assignment for the benefit of creditors; or (c) ceases to conduct business in the normal course. Upon termination or expiration of this Agreement, Provider shall promptly deliver to Client all completed and in-progress Work Product, return all Client confidential information and materials, and cooperate in an orderly transition of services. Client shall pay Provider for all services satisfactorily performed and expenses properly incurred through the effective date of termination.",
     "expected_clause_type": "termination",
     "expected_risk_level": "medium",
     "expected_risk_score_range": [
-      0.31,
-      0.61
+      0.34,
+      0.65
     ],
-    "notes": "The clause allows both parties to terminate for convenience, which is balanced. However, the cure period for material breach is relatively short at 15 days, which may not provide sufficient time for r",
-    "source": "manual_review_2026-03-28"
+    "notes": "Termination clause allows for convenience termination with a 30-day notice, which is reasonable. However, the immediate termination rights could be seen as one-sided if not balanced with similar right",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-007",
+    "id": "gs-009",
     "text": "Section 6. CONFIDENTIALITY\n\nEach party acknowledges that in connection with this Agreement, it may receive or have access to Confidential Information of the other party. \"Confidential Information\" means any and all non-public, proprietary, or trade secret information disclosed by either party, whether orally, in writing, electronically, or by inspection, including but not limited to business plans, financial data, customer lists, pricing information, technical specifications, software source code, algorithms, inventions, and know-how. The receiving party agrees to: (a) hold all Confidential Information in strict confidence; (b) not disclose Confidential Information to any third party without the prior written consent of the disclosing party; (c) use Confidential Information solely for the purposes of this Agreement; and (d) protect Confidential Information using at least the same degree of care used to protect its own confidential information, but no less than reasonable care. The obligations of confidentiality shall survive the termination of this Agreement for a period of five (5) years from the date of disclosure. Confidential Information shall not include information that: (i) was publicly available at the time of disclosure; (ii) becomes publicly available through no fault of the receiving party; (iii) was already in the receiving party's possession prior to disclosure; or (iv) is independently developed by the receiving party without use of the Confidential Information.",
     "expected_clause_type": "confidentiality",
     "expected_risk_level": "low",
@@ -80,71 +104,71 @@
       0.14,
       0.44
     ],
-    "notes": "Standard confidentiality clause with clear definitions and obligations. The exclusions for what constitutes Confidential Information are reasonable and protect both parties.",
-    "source": "manual_review_2026-03-28"
+    "notes": "Standard confidentiality clause with clear definitions and obligations. Provides reasonable protections for both parties' confidential information.",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-008",
+    "id": "gs-010",
     "text": "Section 7. WARRANTIES AND REPRESENTATIONS\n\nProvider warrants and represents that: (a) it has the legal right and authority to enter into this Agreement and perform its obligations hereunder; (b) the services will be performed in a professional and workmanlike manner consistent with generally accepted industry standards; (c) the Work Product will conform to the specifications and requirements set forth in the applicable Statement of Work; (d) the Work Product will be free from material defects for a period of sixty (60) days following delivery (\"Warranty Period\"); and (e) the services and Work Product will not infringe upon or misappropriate any third-party intellectual property rights. EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, PROVIDER MAKES NO OTHER WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. Client's sole remedy for breach of the warranty shall be, at Provider's option, repair or replacement of the defective Work Product or a refund of the fees paid for the defective services.",
     "expected_clause_type": "warranty",
     "expected_risk_level": "medium",
     "expected_risk_score_range": [
-      0.46,
-      0.77
+      0.43,
+      0.73
     ],
-    "notes": "The clause provides specific warranties but limits liability to repair, replacement, or refund, which may not fully compensate the Client for significant breaches. The exclusion of implied warranties ",
-    "source": "manual_review_2026-03-28"
+    "notes": "The clause provides specific warranties but limits liability to repair, replacement, or refund, which may not fully compensate the Client for losses. The exclusion of implied warranties could also lea",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-009",
+    "id": "gs-011",
     "text": "Section 8. PAYMENT TERMS\n\nClient shall pay Provider the fees set forth in each Statement of Work. Unless otherwise specified, Provider shall invoice Client on a monthly basis for services performed during the preceding calendar month. All invoices shall be due and payable within sixty (60) days of receipt (\"Net-60\"). Late payments shall accrue interest at a rate of one and one-half percent (1.5%) per month or the maximum rate permitted by law, whichever is less. Client shall reimburse Provider for all pre-approved, reasonable out-of-pocket expenses incurred in connection with the performance of services, provided that Provider submits itemized expense reports with supporting documentation within thirty (30) days of incurring such expenses. All fees are exclusive of applicable taxes, which shall be Client's responsibility. Either party may dispute any invoice or portion thereof in good faith by providing written notice within fifteen (15) days of receipt, and the parties shall work in good faith to resolve any such dispute.",
     "expected_clause_type": "payment_terms",
     "expected_risk_level": "medium",
     "expected_risk_score_range": [
-      0.33,
-      0.64
+      0.37,
+      0.67
     ],
-    "notes": "The payment terms include a lengthy payment period of 60 days and a high late payment interest rate, which may be burdensome for the Client. The requirement for itemized expense reports adds administr",
-    "source": "manual_review_2026-03-28"
+    "notes": "Standard payment terms with a relatively long payment period (Net-60) and high late payment interest rate. The clause includes provisions for expense reimbursement and dispute resolution, but the long",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-010",
+    "id": "gs-012",
     "text": "Section 9. CORPORATE REPRESENTATIONS\n\nEach party represents and warrants to the other party that: (a) it is duly organized, validly existing, and in good standing under the laws of its jurisdiction of organization; (b) it has full corporate power and authority to execute, deliver, and perform this Agreement; (c) the execution, delivery, and performance of this Agreement have been duly authorized by all necessary corporate action; (d) this Agreement constitutes a legal, valid, and binding obligation enforceable against it in accordance with its terms; (e) the execution and performance of this Agreement will not conflict with or result in a breach of any other agreement to which it is a party; and (f) it is in compliance with all applicable federal, state, and local laws, rules, and regulations in connection with the performance of its obligations under this Agreement.",
-    "expected_clause_type": "warranty",
-    "expected_risk_level": "low",
+    "expected_clause_type": "representations",
+    "expected_risk_level": "medium",
     "expected_risk_score_range": [
-      0.19,
-      0.48
+      0.32,
+      0.62
     ],
-    "notes": "Standard representations and warranties regarding corporate status and authority. No unusual or onerous obligations are present.",
-    "source": "manual_review_2026-03-28"
+    "notes": "Standard representations and warranties clause, but could expose parties to liability if any representation is found to be false. No limitations on liability for breaches of these representations are ",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-011",
+    "id": "gs-013",
     "text": "Section 10. GOVERNING LAW AND DISPUTE RESOLUTION\n\nThis Agreement shall be governed by and construed in accordance with the laws of the State of New York, without regard to its conflict of laws principles. Any dispute, controversy, or claim arising out of or relating to this Agreement, or the breach, termination, or invalidity thereof, shall first be submitted to mediation administered by the American Arbitration Association under its Commercial Mediation Procedures. If mediation is unsuccessful within sixty (60) days, the dispute shall be submitted to binding arbitration administered by the American Arbitration Association under its Commercial Arbitration Rules. The arbitration shall be conducted by a single arbitrator in New York, New York. The decision of the arbitrator shall be final and binding upon the parties and may be entered as a judgment in any court of competent jurisdiction. Each party shall bear its own costs and expenses in connection with any mediation or arbitration, and the parties shall share equally the fees and expenses of the mediator or arbitrator.",
     "expected_clause_type": "dispute_resolution",
     "expected_risk_level": "medium",
     "expected_risk_score_range": [
-      0.3,
-      0.59
+      0.33,
+      0.63
     ],
-    "notes": "The clause outlines a structured process for dispute resolution through mediation and arbitration, which is generally favorable. However, the requirement for both parties to bear their own costs may d",
-    "source": "manual_review_2026-03-28"
+    "notes": "The clause outlines a structured process for dispute resolution through mediation and arbitration, which is generally favorable. However, the requirement for binding arbitration may limit parties' rig",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-012",
+    "id": "gs-014",
     "text": "Section 11. FORCE MAJEURE\n\nNeither party shall be liable for any failure or delay in performing its obligations under this Agreement if such failure or delay results from circumstances beyond the reasonable control of that party, including but not limited to acts of God, natural disasters, war, terrorism, riots, embargoes, acts of civil or military authorities, fire, floods, earthquakes, epidemics, pandemics, quarantine restrictions, strikes, labor disputes, freight embargoes, telecommunications failures, power outages, or interruptions in Internet service (each, a \"Force Majeure Event\"). The affected party shall provide prompt written notice to the other party of the Force Majeure Event and shall use commercially reasonable efforts to mitigate the effects thereof and resume performance as soon as practicable. If a Force Majeure Event continues for more than ninety (90) consecutive days, either party may terminate the affected portion of this Agreement without penalty upon written notice to the other party.",
     "expected_clause_type": "force_majeure",
-    "expected_risk_level": "low",
+    "expected_risk_level": "medium",
     "expected_risk_score_range": [
-      0.14,
-      0.44
+      0.32,
+      0.61
     ],
-    "notes": "Standard force majeure clause that outlines common events and includes notice and mitigation requirements. No unusual or one-sided obligations present.",
-    "source": "manual_review_2026-03-28"
+    "notes": "Standard force majeure clause that outlines circumstances excusing performance. However, the 90-day termination provision may create uncertainty regarding obligations during prolonged events.",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-013",
+    "id": "gs-015",
     "text": "Section 12. ASSIGNMENT\n\nNeither party may assign, transfer, or delegate this Agreement or any of its rights or obligations hereunder without the prior written consent of the other party, which consent shall not be unreasonably withheld, conditioned, or delayed. Notwithstanding the foregoing, either party may assign this Agreement without consent to: (a) an affiliate or subsidiary; or (b) a successor in interest in connection with a merger, acquisition, reorganization, or sale of all or substantially all of its assets, provided that the assignee assumes all obligations of the assigning party under this Agreement. Any attempted assignment in violation of this Section shall be null and void. Subject to the foregoing restrictions, this Agreement shall be binding upon and inure to the benefit of the parties and their respective successors and permitted assigns.",
     "expected_clause_type": "assignment",
     "expected_risk_level": "low",
@@ -152,11 +176,11 @@
       0.11,
       0.41
     ],
-    "notes": "Standard assignment clause with reasonable restrictions and provisions for assignment to affiliates or successors. No unusual terms or one-sided obligations present.",
-    "source": "manual_review_2026-03-28"
+    "notes": "Standard assignment clause with reasonable restrictions and provisions for assignment to affiliates or successors. No unusual terms or one-sided obligations.",
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-014",
+    "id": "gs-016",
     "text": "Section 13. NOTICES\n\nAll notices, requests, demands, and other communications required or permitted under this Agreement shall be in writing and shall be deemed to have been duly given when: (a) delivered personally; (b) sent by certified or registered mail, return receipt requested, postage prepaid; (c) sent by a nationally recognized overnight courier service; or (d) sent by email with confirmation of receipt. Notices shall be addressed to the parties at the addresses set forth on the signature page of this Agreement or to such other address as either party may designate by written notice to the other party in accordance with this Section. Notices sent by mail shall be deemed received three (3) business days after mailing, notices sent by overnight courier shall be deemed received one (1) business day after sending, and notices sent by email shall be deemed received on the date sent if sent during normal business hours, or on the next business day if sent outside normal business hours.",
     "expected_clause_type": "notice",
     "expected_risk_level": "low",
@@ -165,10 +189,10 @@
       0.28
     ],
     "notes": "Standard notice provision with multiple delivery methods and clear timelines for receipt. No unusual requirements or risks identified.",
-    "source": "manual_review_2026-03-28"
+    "source": "manual_review_2026-03-28_v2"
   },
   {
-    "id": "gs-015",
+    "id": "gs-017",
     "text": "Section 14. AMENDMENT AND WAIVER\n\nThis Agreement may not be amended, modified, or supplemented except by a written instrument signed by authorized representatives of both parties. No waiver of any provision of this Agreement shall be effective unless set forth in a written instrument signed by the waiving party. No failure or delay by either party in exercising any right, power, or remedy under this Agreement shall operate as a waiver thereof, nor shall any single or partial exercise of any right, power, or remedy preclude any other or further exercise thereof or the exercise of any other right, power, or remedy. The rights and remedies provided in this Agreement are cumulative and not exclusive of any other rights or remedies provided by law or equity.",
     "expected_clause_type": "amendment",
     "expected_risk_level": "low",
@@ -176,175 +200,7 @@
       0.02,
       0.32
     ],
-    "notes": "Standard clause outlining the requirements for amendments and waivers, ensuring mutual agreement is needed for changes. No unusual or one-sided provisions present.",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-016",
-    "text": "MASTER TECHNOLOGY SERVICES AGREEMENT\n\nAgreement No. MTS-2025-0472 (Final Negotiated)\n\nEffective Date: January 15, 2025 Revision Date: March 4, 2025\n\nThis Master Technology Services Agreement (\"Agreement\") is entered into between NovaTech Solutions Inc., a Delaware corporation (\"Provider\"), and Meridian Global Enterprises LLC, a New York limited liability company (\"Client\"). This Agreement governs the terms and conditions under which Provider shall deliver technology consulting, software development, and related professional services to Client.",
-    "expected_clause_type": "other",
-    "expected_risk_level": "low",
-    "expected_risk_score_range": [
-      0.01,
-      0.31
-    ],
-    "notes": "This introductory clause outlines the parties involved and the general purpose of the agreement. It does not contain any specific obligations or risks.",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-017",
-    "text": "Section 1. INDEMNIFICATION\n\nEach party (the \"Indemnifying Party\") shall indemnify, defend, and hold harmless the other party and its officers, directors, employees, and agents (the \"Indemnified Party\") from and against any and all claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees) arising out of or relating to: (a) any breach of this Agreement by the Indemnifying Party; (b) any negligent or wrongful act or omission of the Indemnifying Party or its personnel; (c) any infringement or misappropriation of any third-party intellectual property rights caused by the Indemnifying Party; and (d) any violation of applicable laws or regulations by the Indemnifying Party. Each party's total aggregate indemnification liability under this Agreement shall not exceed Two Million Dollars ($2,000,000) in the aggregate. The Indemnified Party shall provide the Indemnifying Party with prompt written notice of any claim for which indemnification is sought and shall cooperate with the Indemnifying Party in the defense of such claim. The Indemnifying Party shall have the right to control the defense and settlement of any such claim, provided that the Indemnifying Party shall not settle any claim without the Indemnified Party's prior written consent if such settlement would impose any obligation on the Indemnified Party or adversely affect the Indemnified Party's rights. This indemnification obligation shall survive the termination or expiration of this Agreement for a period of twelve (12) months.",
-    "expected_clause_type": "indemnification",
-    "expected_risk_level": "medium",
-    "expected_risk_score_range": [
-      0.51,
-      0.81
-    ],
-    "notes": "The clause provides mutual indemnification, which is positive, but the aggregate liability cap may still expose parties to significant risk depending on the nature of claims. The survival period of 12",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-018",
-    "text": "Section 2. LIMITATION OF LIABILITY\n\nEXCEPT FOR BREACHES OF CONFIDENTIALITY OBLIGATIONS, IN NO EVENT SHALL EITHER PARTY BE LIABLE TO THE OTHER PARTY FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, LOSS OF REVENUE, LOSS OF DATA, OR BUSINESS INTERRUPTION, REGARDLESS OF THE CAUSE OF ACTION OR THE THEORY OF LIABILITY, EVEN IF SUCH PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. NOTWITHSTANDING THE FOREGOING, EACH PARTY'S TOTAL AGGREGATE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED TWO TIMES (2X) THE TOTAL FEES PAID OR PAYABLE UNDER THIS AGREEMENT DURING THE TWELVE (12) MONTH PERIOD IMMEDIATELY PRECEDING THE EVENT GIVING RISE TO THE CLAIM. This limitation applies collectively to all claims arising under or related to this Agreement. For the avoidance of doubt, this limitation of liability shall apply equally to both parties and to the fullest extent permitted by applicable law.",
-    "expected_clause_type": "limitation_of_liability",
-    "expected_risk_level": "medium",
-    "expected_risk_score_range": [
-      0.45,
-      0.76
-    ],
-    "notes": "The clause includes a mutual limitation of liability and caps damages at 2x the fees paid in the last 12 months, which is reasonable. However, the exclusion of indirect and consequential damages may l",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-019",
-    "text": "Section 4. TERMINATION\n\nEither party may terminate this Agreement for convenience upon thirty (30) days prior written notice to the other party. Either party may terminate this Agreement immediately upon written notice if the other party: (a) materially breaches any provision of this Agreement and fails to cure such breach within fifteen (15) days after receiving written notice thereof; (b) becomes insolvent, files for bankruptcy, or makes an assignment for the benefit of creditors; or (c) ceases to conduct business in the normal course. Upon termination or expiration of this Agreement, Provider shall promptly deliver to Client all completed and in-progress Work Product, return all Client confidential information and materials, and cooperate in an orderly transition of services. Client shall pay Provider for all services satisfactorily performed and expenses properly incurred through the effective date of termination.",
-    "expected_clause_type": "termination",
-    "expected_risk_level": "medium",
-    "expected_risk_score_range": [
-      0.31,
-      0.61
-    ],
-    "notes": "The clause allows both parties to terminate for convenience, which is balanced. However, the cure period for material breach is relatively short at 15 days, which may not provide sufficient time for r",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-020",
-    "text": "Section 5. CONFIDENTIALITY\n\nEach party acknowledges that in connection with this Agreement, it may receive or have access to Confidential Information of the other party. \"Confidential Information\" means any and all non-public, proprietary, or trade secret information disclosed by either party, whether orally, in writing, electronically, or by inspection, including but not limited to business plans, financial data, customer lists, pricing information, technical specifications, software source code, algorithms, inventions, and know-how. The receiving party agrees to: (a) hold all Confidential Information in strict confidence; (b) not disclose Confidential Information to any third party without the prior written consent of the disclosing party, except to its employees, contractors, and advisors who have a need to know and are bound by confidentiality obligations no less restrictive than those set forth herein; (c) use Confidential Information solely for the purposes of this Agreement; and (d) protect Confidential Information using at least the same degree of care used to protect its own confidential information, but no less than reasonable care. The obligations of confidentiality shall survive the termination of this Agreement for a period of two (2) years from the date of disclosure. Confidential Information shall not include information that: (i) was publicly available at the time of disclosure; (ii) becomes publicly available through no fault of the receiving party; (iii) was already in the receiving party's possession prior to disclosure; (iv) is independently developed by the receiving party without use of the Confidential Information; or (v) is required to be disclosed by law, regulation, or court order, provided that the receiving party gives the disclosing party prompt written notice of such requirement.",
-    "expected_clause_type": "confidentiality",
-    "expected_risk_level": "medium",
-    "expected_risk_score_range": [
-      0.28,
-      0.58
-    ],
-    "notes": "The clause provides a comprehensive definition of Confidential Information and outlines obligations for protection. However, the two-year survival period may be considered short for certain types of s",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-021",
-    "text": "Section 6. WARRANTIES AND REPRESENTATIONS\n\nProvider warrants and represents that: (a) it has the legal right and authority to enter into this Agreement and perform its obligations hereunder; (b) the services will be performed in a professional and workmanlike manner consistent with generally accepted industry standards; (c) the Work Product will conform to the specifications and requirements set forth in the applicable Statement of Work; (d) the Work Product will be free from material defects for a period of sixty (60) days following delivery (\"Warranty Period\"); and (e) the services and Work Product will not infringe upon or misappropriate any third-party intellectual property rights. EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, PROVIDER MAKES NO OTHER WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. Client's sole remedy for breach of the warranty shall be, at Provider's option, repair or replacement of the defective Work Product or a refund of the fees paid for the defective services.",
-    "expected_clause_type": "warranty",
-    "expected_risk_level": "medium",
-    "expected_risk_score_range": [
-      0.46,
-      0.77
-    ],
-    "notes": "The clause provides specific warranties but limits liability to repair, replacement, or refund, which may not fully compensate the Client for significant breaches. The exclusion of implied warranties ",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-022",
-    "text": "Section 7. PAYMENT TERMS\n\nClient shall pay Provider the fees set forth in each Statement of Work. Unless otherwise specified, Provider shall invoice Client on a monthly basis for services performed during the preceding calendar month. All invoices shall be due and payable within thirty (30) days of receipt (\"Net-30\"). Late payments shall accrue interest at a rate of one percent (1.0%) per month or the maximum rate permitted by law, whichever is less. Client shall reimburse Provider for all pre-approved, reasonable out-of-pocket expenses incurred in connection with the performance of services, provided that Provider submits itemized expense reports with supporting documentation within thirty (30) days of incurring such expenses. All fees are exclusive of applicable taxes, which shall be Client's responsibility. Either party may dispute any invoice or portion thereof in good faith by providing written notice within fifteen (15) days of receipt, and the parties shall work in good faith to resolve any such dispute within thirty (30) days of the dispute notice.",
-    "expected_clause_type": "payment_terms",
-    "expected_risk_level": "medium",
-    "expected_risk_score_range": [
-      0.33,
-      0.64
-    ],
-    "notes": "The payment terms are generally standard, but the late payment interest rate could be considered high, and the reimbursement process for expenses may impose additional administrative burdens on the Cl",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-023",
-    "text": "Section 8. CORPORATE REPRESENTATIONS\n\nEach party represents and warrants to the other party that: (a) it is duly organized, validly existing, and in good standing under the laws of its jurisdiction of organization; (b) it has full corporate power and authority to execute, deliver, and perform this Agreement; (c) the execution, delivery, and performance of this Agreement have been duly authorized by all necessary corporate action; (d) this Agreement constitutes a legal, valid, and binding obligation enforceable against it in accordance with its terms; (e) the execution and performance of this Agreement will not conflict with or result in a breach of any other agreement to which it is a party; and (f) it is in compliance with all applicable federal, state, and local laws, rules, and regulations in connection with the performance of its obligations under this Agreement.",
-    "expected_clause_type": "warranty",
-    "expected_risk_level": "low",
-    "expected_risk_score_range": [
-      0.19,
-      0.48
-    ],
-    "notes": "Standard representations and warranties regarding corporate status and authority. No unusual or one-sided obligations present.",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-024",
-    "text": "Section 9. GOVERNING LAW AND DISPUTE RESOLUTION\n\nThis Agreement shall be governed by and construed in accordance with the laws of the State of New York, without regard to its conflict of laws principles. Any dispute, controversy, or claim arising out of or relating to this Agreement, or the breach, termination, or invalidity thereof, shall first be submitted to mediation administered by the American Arbitration Association under its Commercial Mediation Procedures. If mediation is unsuccessful within sixty (60) days, the dispute shall be submitted to binding arbitration administered by the American Arbitration Association under its Commercial Arbitration Rules. The arbitration shall be conducted by a single arbitrator in New York, New York. The decision of the arbitrator shall be final and binding upon the parties and may be entered as a judgment in any court of competent jurisdiction. Each party shall bear its own costs and expenses in connection with any mediation or arbitration, and the parties shall share equally the fees and expenses of the mediator or arbitrator.",
-    "expected_clause_type": "dispute_resolution",
-    "expected_risk_level": "medium",
-    "expected_risk_score_range": [
-      0.3,
-      0.59
-    ],
-    "notes": "The clause outlines a clear process for dispute resolution through mediation and arbitration, which is generally favorable. However, the requirement for arbitration in New York may impose logistical c",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-025",
-    "text": "Section 10. ASSIGNMENT\n\nNeither party may assign, transfer, or delegate this Agreement or any of its rights or obligations hereunder without the prior written consent of the other party, which consent shall not be unreasonably withheld, conditioned, or delayed. Notwithstanding the foregoing, either party may assign this Agreement without consent to: (a) an affiliate or subsidiary; or (b) a successor in interest in connection with a merger, acquisition, reorganization, or sale of all or substantially all of its assets, provided that the assignee assumes all obligations of the assigning party under this Agreement. Any attempted assignment in violation of this Section shall be null and void. Subject to the foregoing restrictions, this Agreement shall be binding upon and inure to the benefit of the parties and their respective successors and permitted assigns.",
-    "expected_clause_type": "assignment",
-    "expected_risk_level": "medium",
-    "expected_risk_score_range": [
-      0.25,
-      0.55
-    ],
-    "notes": "The clause restricts assignment without consent, which can limit flexibility for both parties. However, it allows assignment to affiliates and successors, which mitigates some risk. The requirement fo",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-026",
-    "text": "Section 11. NOTICES\n\nAll notices, requests, demands, and other communications required or permitted under this Agreement shall be in writing and shall be deemed to have been duly given when: (a) delivered personally; (b) sent by certified or registered mail, return receipt requested, postage prepaid; (c) sent by a nationally recognized overnight courier service; or (d) sent by email with confirmation of receipt. Notices shall be addressed to the parties at the addresses set forth on the signature page of this Agreement or to such other address as either party may designate by written notice to the other party in accordance with this Section. Notices sent by mail shall be deemed received three (3) business days after mailing, notices sent by overnight courier shall be deemed received one (1) business day after sending, and notices sent by email shall be deemed received on the date sent if sent during normal business hours, or on the next business day if sent outside normal business hours.",
-    "expected_clause_type": "notice",
-    "expected_risk_level": "low",
-    "expected_risk_score_range": [
-      0.0,
-      0.28
-    ],
-    "notes": "Standard notice provision with multiple delivery methods and clear timelines for receipt. No unusual requirements or risks identified.",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-027",
-    "text": "Section 12. AMENDMENT AND WAIVER\n\nThis Agreement may not be amended, modified, or supplemented except by a written instrument signed by authorized representatives of both parties. No waiver of any provision of this Agreement shall be effective unless set forth in a written instrument signed by the waiving party. No failure or delay by either party in exercising any right, power, or remedy under this Agreement shall operate as a waiver thereof, nor shall any single or partial exercise of any right, power, or remedy preclude any other or further exercise thereof or the exercise of any other right, power, or remedy. The rights and remedies provided in this Agreement are cumulative and not exclusive of any other rights or remedies provided by law or equity.",
-    "expected_clause_type": "amendment",
-    "expected_risk_level": "low",
-    "expected_risk_score_range": [
-      0.02,
-      0.32
-    ],
-    "notes": "Standard clause outlining the requirements for amendments and waivers, ensuring mutual agreement is needed for changes. No unusual or one-sided provisions present.",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-028",
-    "text": "Section 13. DATA PROTECTION AND PRIVACY\n\nBoth parties shall comply with all applicable data protection and privacy laws and regulations, including but not limited to the General Data Protection Regulation (GDPR), the California Consumer Privacy Act (CCPA), and any other applicable federal, state, provincial, or international data protection legislation. Provider shall implement and maintain appropriate technical and organizational measures to protect personal data against unauthorized or unlawful processing, accidental loss, destruction, or damage. Such measures shall include, at a minimum: (a) encryption of personal data in transit and at rest using industry-standard encryption algorithms; (b) access controls limiting access to personal data to authorized personnel on a need-to-know basis; (c) incident response procedures for prompt notification of data breaches; and (d) data retention policies ensuring personal data is not retained longer than necessary. Provider shall process personal data only on Client's documented instructions and shall not transfer personal data to any third party or outside the jurisdiction without Client's prior written consent. In the event of a data breach involving Client's personal data, Provider shall notify Client within seventy-two (72) hours of becoming aware of the breach. Both parties shall cooperate in the investigation and remediation of such breach. Provider's liability for data breaches shall be subject to the limitation of liability set forth in Section 2 of this Agreement.",
-    "expected_clause_type": "confidentiality",
-    "expected_risk_level": "high",
-    "expected_risk_score_range": [
-      0.45,
-      0.76
-    ],
-    "notes": "The clause imposes significant obligations on the Provider regarding data protection, but the liability for breaches is limited by another section, which may not provide adequate protection for the Cl",
-    "source": "manual_review_2026-03-28"
-  },
-  {
-    "id": "gs-029",
-    "text": "Section 14. AUDIT RIGHTS\n\nClient shall have the right, at its own expense and upon reasonable prior written notice of not less than thirty (30) business days, to audit and inspect Provider's books, records, and systems to the extent directly relevant to the services performed and fees charged under this Agreement. Such audits may be conducted no more than once per calendar year during normal business hours and shall not unreasonably interfere with Provider's business operations. Provider shall cooperate reasonably with any such audit and shall provide access to relevant records within a reasonable timeframe. If an audit reveals any material overcharging in excess of five percent (5%) of the fees paid during the audit period, Provider shall promptly refund any overpayment and reimburse Client for the reasonable cost of the audit. Provider shall maintain complete and accurate records relating to its performance under this Agreement for a period of two (2) years following the termination or expiration of this Agreement.",
-    "expected_clause_type": "other",
-    "expected_risk_level": "medium",
-    "expected_risk_score_range": [
-      0.36,
-      0.66
-    ],
-    "notes": "The clause grants Client significant audit rights, which could lead to operational disruptions for Provider. While the notice period and frequency are reasonable, the potential for material overchargi",
-    "source": "manual_review_2026-03-28"
+    "notes": "Standard clause outlining the requirements for amendments and waivers. Clearly states that changes must be in writing and signed by both parties, which protects both parties' interests.",
+    "source": "manual_review_2026-03-28_v2"
   }
 ]
