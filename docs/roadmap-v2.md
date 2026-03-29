@@ -121,19 +121,28 @@ v2.0 transforms ContractLens from a working prototype into a production-ready pl
 
 ## Feature Summary
 
-| Feature | ADR | Release | Status |
-|---------|-----|---------|--------|
-| Technology stack | ADR-001 | v1.0 | Implemented |
-| HNSW vector index | ADR-002 | v1.0 | Implemented |
-| LLM classification (GPT-4o-mini) | ADR-003 | v1.0 | Implemented |
-| Version comparison (hybrid) | ADR-004 | v1.0 | Implemented (chunk-level) |
-| Section-aware comparison | ADR-004 addendum | v1.3 | Planned |
-| Real-time updates (Supabase + SSE) | ADR-005 | v2.0 | Proposed |
-| Configurable clause taxonomy | ADR-006 | v2.0 | Proposed |
-| Perspective-aware risk scoring | ADR-003 addendum | v2.0 | Proposed |
-| Redis caching & rate limiting | — | v1.3/v2.0 | Planned |
-| Testing suite | — | v2.0 | Planned |
-| Production deployment | — | v2.0 | Planned |
+| Feature | ADR | Status |
+|---------|-----|--------|
+| Technology stack | ADR-001 | Implemented |
+| HNSW vector index | ADR-002 | Implemented |
+| LLM classification (GPT-4o-mini) | ADR-003 | Implemented |
+| Version comparison (hybrid) | ADR-004 | Implemented (pgvector nearest-neighbor) |
+| Classification pipeline optimization | ADR-007 | Implemented (84s -> 12s) |
+| CVSS-inspired risk scoring | ADR-008 | Implemented |
+| Structured outputs + few-shot | ADR-009 | Implemented |
+| Docling parsing + section chunking | ADR-010 | Implemented |
+| Evaluation framework | ADR-011 | Implemented (96.6% baseline) |
+| Embedding model upgrade | ADR-012 | Implemented (text-embedding-3-large) |
+| AI observability (Langfuse) | ADR-013 | Implemented |
+| AI security (sanitization + anomaly) | ADR-014 | Implemented (Phase 1) |
+| CI/CD eval gate | ADR-015 | Implemented |
+| Configurable clause taxonomy | ADR-006 | Implemented (Phase 1-3, YAML + 23 types) |
+| Custom types UI | ADR-006 Phase 4-5 | Planned |
+| Real-time updates (SSE) | ADR-005 | Proposed |
+| Perspective-aware risk scoring | ADR-003 addendum | Proposed |
+| Redis caching + rate limiting | ADR-014 Phase 2 | Planned |
+| Testing suite (unit/integration/E2E) | - | Planned |
+| Production deployment | - | Planned |
 
 ## Dependencies & Risks
 

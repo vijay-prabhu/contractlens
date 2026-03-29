@@ -96,20 +96,33 @@ ContractLens is an AI-powered contract review and risk analysis tool that helps 
 
 | Service | Responsibility |
 |---------|----------------|
-| `extraction_service.py` | PDF (PyMuPDF) and DOCX (python-docx) text extraction |
-| `chunking_service.py` | LangChain RecursiveCharacterTextSplitter (800 chars, 150 overlap) |
-| `embedding_service.py` | OpenAI text-embedding-3-small (1536 dimensions) |
-| `classification_service.py` | GPT-4o-mini clause classification and risk scoring |
-| `search_service.py` | pgvector cosine similarity search |
-| `comparison_service.py` | Text diff (difflib) + semantic diff (embeddings) |
+| `docling_extraction_service.py` | Primary: Docling structured extraction (sections, tables, metadata) |
+| `extraction_service.py` | Fallback: PyMuPDF / python-docx flat text extraction |
+| `section_chunking_service.py` | Section-aware chunking (~2000 chars, sentence-boundary splits) |
+| `chunking_service.py` | Fallback: LangChain RecursiveCharacterTextSplitter |
+| `embedding_service.py` | OpenAI text-embedding-3-large (dimensions=1536) |
+| `classification_service.py` | GPT-4o-mini-2024-07-18 (pinned), structured outputs, temperature=0 |
+| `risk_scoring.py` | CVSS-inspired document-level risk scoring |
+| `search_service.py` | pgvector cosine similarity (latest version filter, min_similarity=0.5) |
+| `comparison_service.py` | Text diff (difflib) + pgvector nearest-neighbor semantic matching |
 | `document_service.py` | Document CRUD, storage operations |
+
+#### Cross-Cutting Modules
+
+| Module | Location | Responsibility |
+|--------|----------|----------------|
+| `clause_taxonomy.py` | `core/` | Loads 23 clause types from `config/clause_types.yaml`, builds LLM prompt |
+| `constants.py` | `core/` | Risk thresholds, similarity thresholds, poll interval |
+| `security.py` | `core/` | Prompt injection sanitization, anomaly detection, rate limit helpers |
+| `dependencies.py` | `api/` | FastAPI Depends() factories for services |
 
 #### Background Processing
 
 **Current Implementation**: Polling-based worker
-- `document_processor.py` polls every 5 seconds for `status='uploaded'` documents
-- Processes sequentially: extract → chunk → embed → classify
-- Updates status: `uploaded` → `processing` → `completed` / `failed`
+- `document_processor.py` polls every 15 seconds for `status='uploaded'` documents (or stuck states > 2 min)
+- Pipeline: Docling extract -> section chunk -> batch embed -> parallel classify (PyMuPDF fallback)
+- Updates status: `uploaded` -> `processing` -> `extracting` -> `analyzing` -> `completed` / `failed`
+- Sentry transaction tracing with per-stage timing logs
 
 ### Database (PostgreSQL + pgvector)
 
@@ -154,10 +167,12 @@ ContractLens is an AI-powered contract review and risk analysis tool that helps 
 
 | Service | Purpose | Model/Details |
 |---------|---------|---------------|
-| OpenAI Embeddings | Vector generation | text-embedding-3-small (1536 dims) |
-| OpenAI Chat | Clause classification | GPT-4o-mini, temperature=0.1 |
+| OpenAI Embeddings | Vector generation | text-embedding-3-large (dimensions=1536) |
+| OpenAI Chat | Clause classification | GPT-4o-mini-2024-07-18, structured outputs, temperature=0 |
 | Supabase Storage | File storage | `documents` bucket |
 | Supabase Auth | Authentication | JWT with ES256 signing |
+| Langfuse | AI observability | LLM call tracing, token/cost tracking (optional) |
+| Sentry | Error tracking | Backend + frontend instrumentation |
 
 ## Data Flow
 
@@ -178,16 +193,16 @@ ContractLens is an AI-powered contract review and risk analysis tool that helps 
    Status → 'processing'
          │
          ▼
-5. Text extraction (PyMuPDF / python-docx)
+5. Text extraction (Docling primary, PyMuPDF fallback)
          │
          ▼
-6. Text chunking (800 chars, 150 overlap)
+6. Section-aware chunking (~2000 chars, sentence boundaries)
          │
          ▼
 7. Batch embedding generation (OpenAI)
          │
          ▼
-8. Clause classification + risk scoring (GPT-4o-mini)
+8. Parallel clause classification (GPT-4o-mini, structured outputs) + CVSS-inspired risk scoring
          │
          ▼
 9. Clauses saved with embeddings to pgvector
@@ -266,9 +281,10 @@ ContractLens is an AI-powered contract review and risk analysis tool that helps 
 
 ### Known Limitations
 
-- **Polling latency**: 5-second delay for status updates
-- **Sequential processing**: One document at a time
+- **Polling latency**: 15-second poll interval for background worker, 2-second UI polling
+- **Sequential processing**: One document at a time in the background worker
 - **No caching**: Embeddings regenerated on each search query
+- **No real-time updates**: HTTP polling instead of SSE/WebSocket (ADR-005 proposed)
 
 ## Future Architecture
 
@@ -330,14 +346,16 @@ ContractLens is an AI-powered contract review and risk analysis tool that helps 
              └──────────┘  └──────────┘  └──────────┘
 ```
 
-## Monitoring & Observability (Planned)
+## Monitoring & Observability
 
-| Aspect | Tool/Approach |
-|--------|---------------|
-| Logging | Structured JSON logs, X-Request-ID tracing |
-| Metrics | Prometheus + Grafana |
-| Error tracking | Sentry |
-| APM | OpenTelemetry |
+| Aspect | Tool | Status |
+|--------|------|--------|
+| Error tracking | Sentry (backend + frontend) | Implemented |
+| AI observability | Langfuse (LLM call tracing, token/cost) | Implemented |
+| Logging | Structured logs with X-Request-ID, per-stage timing | Implemented |
+| CI/CD eval gate | GitHub Actions classification eval | Implemented |
+| Metrics | Prometheus + Grafana | Planned |
+| APM | OpenTelemetry | Planned |
 
 ## References
 
@@ -347,4 +365,13 @@ ContractLens is an AI-powered contract review and risk analysis tool that helps 
 - [ADR-004: Version Comparison Strategy](adr/ADR-004-version-comparison-strategy.md)
 - [ADR-005: Real-time Update Architecture](adr/ADR-005-realtime-architecture.md)
 - [ADR-006: Configurable Clause Taxonomy](adr/ADR-006-configurable-clause-taxonomy.md)
+- [ADR-007: Classification Pipeline Optimization](adr/ADR-007-classification-pipeline-optimization.md)
+- [ADR-008: Risk Scoring Methodology](adr/ADR-008-risk-scoring-methodology.md)
+- [ADR-009: Classification Quality](adr/ADR-009-classification-quality.md)
+- [ADR-010: Document Parsing & Chunking](adr/ADR-010-document-parsing-and-chunking.md)
+- [ADR-011: Evaluation Framework](adr/ADR-011-evaluation-framework.md)
+- [ADR-012: Embedding Model Upgrade](adr/ADR-012-embedding-model-upgrade.md)
+- [ADR-013: AI Observability](adr/ADR-013-ai-observability.md)
+- [ADR-014: AI Security](adr/ADR-014-ai-security.md)
+- [ADR-015: CI/CD Evaluation Gate](adr/ADR-015-ci-cd-eval-gate.md)
 - [v2.0 Roadmap](roadmap-v2.md)
