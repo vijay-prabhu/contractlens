@@ -1,6 +1,10 @@
 # ContractLens
 
-AI-powered contract review and risk analysis platform. Upload legal documents (PDF, DOCX), get automatic clause classification, risk scoring, semantic search, and version comparison — powered by LLMs and vector embeddings.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-green.svg)](https://python.org)
+[![Classification Accuracy](https://img.shields.io/badge/Clause_Accuracy-96.6%25-brightgreen.svg)](tests/evaluation/)
+
+I built ContractLens to make contract review faster. Upload a PDF or DOCX, and it classifies every clause, scores the risk, and lets you search across all your contracts semantically. Compare two versions of the same contract and see exactly what changed and whether risk went up or down.
 
 ## Architecture
 
@@ -18,7 +22,8 @@ graph TB
     subgraph External Services
         D[(PostgreSQL + pgvector<br/>Supabase)]
         E[Supabase Auth<br/>+ Storage]
-        F[OpenAI API<br/>GPT-4o-mini<br/>text-embedding-3-small]
+        F[OpenAI API<br/>GPT-4o-mini + text-embedding-3-large]
+        G[Langfuse<br/>AI Observability]
     end
 
     A -->|REST + JWT| B
@@ -28,17 +33,21 @@ graph TB
     B --> E
     C --> D
     C --> F
+    C --> G
     B --> F
 ```
 
 ## Features
 
-- **Document Upload** — Drag-and-drop PDF/DOCX upload with validation (10MB limit)
-- **AI-Powered Clause Classification** — Automatic detection of 14 clause types (Indemnification, Termination, Confidentiality, IP, Payment Terms, etc.)
-- **Risk Scoring** — Four-level risk assessment (Critical / High / Medium / Low) with explanations
-- **Semantic Search** — Vector-based search across document clauses using pgvector + HNSW index
-- **Version Comparison** — Text diff and semantic diff between document versions with risk delta calculation
-- **Authentication** — JWT-based auth with Supabase Auth (cookie-based sessions, route protection)
+- **Document Upload** - Drag-and-drop PDF/DOCX with validation (10MB limit)
+- **23 Clause Types** - Automatic classification including indemnification, non-compete, data protection, limitation of liability, termination, IP, and more. Taxonomy is config-driven from YAML.
+- **Risk Scoring** - CVSS-inspired formula. Four levels (Critical / High / Medium / Low) with per-clause explanations and recommendations.
+- **Semantic Search** - Vector search across all your clauses using pgvector + HNSW index
+- **Version Comparison** - Text diff + semantic matching between versions. Shows added, removed, modified clauses with risk trend detection.
+- **Structured Outputs** - GPT-4o-mini with Pydantic schema enforcement. Zero JSON parse failures. Few-shot examples for calibration.
+- **AI Observability** - Langfuse traces every LLM call with token counts, cost, and latency
+- **AI Security** - Input sanitization against prompt injection, output anomaly detection
+- **Evaluation Framework** - 29-clause gold standard, 96.6% type accuracy baseline, CI/CD quality gates
 
 ## Tech Stack
 
@@ -46,11 +55,11 @@ graph TB
 |-------|-----------|
 | **Frontend** | Next.js 14 (App Router), TypeScript, Tailwind CSS, Lucide React |
 | **Backend** | FastAPI, Python 3.11, SQLAlchemy (async), psycopg3 |
-| **AI/ML** | OpenAI API — GPT-4o-mini (classification), text-embedding-3-large (embeddings) |
+| **AI/ML** | OpenAI API - GPT-4o-mini-2024-07-18 (classification), text-embedding-3-large (embeddings) |
 | **Database** | PostgreSQL + pgvector (Supabase) with HNSW vector index |
 | **Auth & Storage** | Supabase Auth (@supabase/ssr) + Supabase Storage |
-| **Document Parsing** | PyMuPDF (PDF), python-docx (DOCX), LangChain (chunking) |
-| **Monitoring** | Sentry (error tracking, both frontend and backend) |
+| **Document Parsing** | Docling (primary, structured output), PyMuPDF (fallback) |
+| **Monitoring** | Sentry (errors), Langfuse (AI observability), GitHub Actions (eval CI/CD) |
 | **Containerization** | Docker + Docker Compose |
 
 ## How It Works
@@ -72,10 +81,10 @@ sequenceDiagram
     API-->>FE: Document ID
 
     W->>DB: Poll for uploaded documents
-    W->>W: Extract text (PyMuPDF / python-docx)
-    W->>W: Chunk text (800 chars, 150 overlap)
-    W->>OAI: Generate embeddings (text-embedding-3-small)
-    W->>OAI: Classify clauses + score risk (GPT-4o-mini)
+    W->>W: Extract (Docling sections + tables)
+    W->>W: Section-aware chunking (~2000 chars)
+    W->>OAI: Batch embeddings (text-embedding-3-large)
+    W->>OAI: Parallel classify (GPT-4o-mini, structured outputs)
     W->>DB: Store clauses + embeddings (status: completed)
 
     FE->>API: GET /documents/{id}/analysis
@@ -85,15 +94,15 @@ sequenceDiagram
 
 ### Semantic Search
 
-1. User query is embedded via OpenAI text-embedding-3-small
-2. pgvector performs cosine similarity search using HNSW index
-3. Results filtered by user's documents and ranked by relevance score
+1. User query embedded via OpenAI text-embedding-3-large
+2. pgvector cosine similarity search with HNSW index (latest version only)
+3. Results filtered by user's documents, ranked by relevance (min similarity 0.5)
 
 ### Version Comparison
 
 1. Text diff using Python `difflib` (additions, deletions, modifications)
-2. Semantic clause matching via embedding similarity (same / modified / added / removed thresholds)
-3. Risk delta calculation between versions
+2. Semantic clause matching via pgvector nearest-neighbor (unchanged / modified / added / removed)
+3. CVSS-inspired risk scoring with relative trend detection and escalation tracking
 
 ## Project Structure
 
@@ -101,29 +110,35 @@ sequenceDiagram
 contractlens/
 ├── backend/
 │   ├── app/
-│   │   ├── api/              # REST endpoints (documents, search, comparison)
-│   │   ├── core/             # Config, auth, middleware, database
+│   │   ├── api/              # REST endpoints + DI factories
+│   │   ├── core/             # Config, auth, constants, security, taxonomy
 │   │   ├── models/           # SQLAlchemy models (document, clause, user)
-│   │   ├── services/         # Business logic (extraction, chunking, embedding,
-│   │   │                     #   classification, search, comparison)
+│   │   ├── services/         # Docling extraction, section chunking, embedding,
+│   │   │                     #   classification, risk scoring, search, comparison
 │   │   └── workers/          # Background document processor
+│   ├── config/               # clause_types.yaml (taxonomy source of truth)
 │   ├── migrations/           # SQL schema migrations
-│   ├── tests/                # pytest test suite
-│   ├── Dockerfile
+│   ├── scripts/              # Bulk reprocessing
 │   └── pyproject.toml
 ├── frontend/
 │   ├── src/
 │   │   ├── app/              # Next.js pages (dashboard, search, compare)
 │   │   ├── components/       # React components
-│   │   ├── lib/              # API client, Supabase client, utilities
+│   │   ├── lib/              # API client, constants, Supabase client, utilities
 │   │   └── types/            # TypeScript definitions
 │   └── package.json
+├── tests/
+│   └── evaluation/           # Gold standard test set + eval script
 ├── docs/
 │   ├── architecture.md       # Detailed architecture documentation
-│   └── adr/                  # Architecture Decision Records
+│   ├── roadmap-v2.md         # v2 roadmap
+│   └── adr/                  # 15 Architecture Decision Records
+├── .github/workflows/        # CI/CD eval gate
 ├── dev-start.sh              # Start backend + frontend locally
 ├── dev-stop.sh               # Stop all local services
 ├── dev-logs.sh               # Tail service logs
+├── AGENTS.md                 # AI agent instructions (Claude Code, Cursor, etc.)
+├── CONTRIBUTING.md            # Contributor guide
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -146,7 +161,7 @@ contractlens/
 
 All endpoints except `/health` require JWT authentication via `Authorization: Bearer <token>` header.
 
-API docs (Swagger UI) available at `http://localhost:8200/docs` when running locally.
+API docs (Swagger UI) at `http://localhost:8200/docs` when running locally.
 
 ## Getting Started
 
@@ -167,13 +182,9 @@ API docs (Swagger UI) available at `http://localhost:8200/docs` when running loc
 
 2. **Configure environment variables**
    ```bash
-   # Backend
    cp .env.example .env
-   # Edit .env with your Supabase and OpenAI credentials
-
-   # Frontend
    cp frontend/.env.example frontend/.env.local
-   # Edit frontend/.env.local with your Supabase public keys
+   # Edit both files with your Supabase and OpenAI credentials
    ```
 
 3. **Set up the database**
@@ -204,24 +215,28 @@ API docs (Swagger UI) available at `http://localhost:8200/docs` when running loc
 
 5. Open http://localhost:3200
 
-## Testing
+## Classification Accuracy
 
+Measured against a 29-clause gold standard from a real technology services agreement:
+
+| Metric | Score |
+|--------|-------|
+| Clause type accuracy | 96.6% |
+| Risk level accuracy | 93.1% |
+| Score in range | 96.6% |
+| Failure rate | 0% |
+
+Run the evaluation yourself:
 ```bash
-cd backend
-poetry run pytest -v
-
-# With coverage
-poetry run pytest --cov=app --cov-report=html
+cd backend && poetry run python ../tests/evaluation/evaluate.py --save
 ```
-
-38 tests covering auth, documents, search, and comparison.
 
 ## Architecture Decisions
 
-Key technical decisions are documented as ADRs:
+15 ADRs document every major technical decision:
 
-- [ADR-001: Technology Stack Selection](docs/adr/ADR-001-technology-stack.md)
-- [ADR-002: Vector Index Selection — HNSW vs ivfflat](docs/adr/ADR-002-vector-index-selection.md)
+- [ADR-001: Technology Stack](docs/adr/ADR-001-technology-stack.md)
+- [ADR-002: Vector Index Selection](docs/adr/ADR-002-vector-index-selection.md)
 - [ADR-003: LLM Classification Strategy](docs/adr/ADR-003-llm-classification-strategy.md)
 - [ADR-004: Version Comparison Strategy](docs/adr/ADR-004-version-comparison-strategy.md)
 - [ADR-005: Real-time Architecture](docs/adr/ADR-005-realtime-architecture.md)
@@ -235,6 +250,10 @@ Key technical decisions are documented as ADRs:
 - [ADR-013: AI Observability](docs/adr/ADR-013-ai-observability.md)
 - [ADR-014: AI Security](docs/adr/ADR-014-ai-security.md)
 - [ADR-015: CI/CD Evaluation Gate](docs/adr/ADR-015-ci-cd-eval-gate.md)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code style, and PR process.
 
 ## License
 
